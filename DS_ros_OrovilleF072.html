@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+	<title>2017 Oroville (72-hr Forecast)</title>
+
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" integrity="sha512-xodZBNTC5n17Xt2atTPuE1HxjVMSvLVW9ocqUKLsCC5CXdbqCmblAshOMAS6/keqq/sMZMZ19scR4PsZChSR7A==" crossorigin=""/>
+  <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js" integrity="sha512-XQoYMqMTK8LvdxXYG3nZ448hOEQiglfqkJs1NOQV44cWnUrBc8PkAOcXy20w0vlaXaVUearIOBhiXZ5V3ynxwA==" crossorigin=""></script>
+
+	<link rel="stylesheet" href="https://cw3e.ucsd.edu/DSMaps/js_plugins/jquery-ui.css">
+	<script src="https://code.jquery.com/jquery-1.12.4.js"></script>
+  <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+	<script src="https://cw3e.ucsd.edu/DSMaps/js_plugins/SliderControl.js" type="text/javascript"></script>
+	<script src="https://cw3e.ucsd.edu/DSMaps/js_plugins/leaflet.groupedlayercontrol.js"></script>
+	<script type="text/javascript" src="file:///G:/Shared%20drives/CW3E%20Snow/Ryoko/2021_webmap/img/Oroville/201702040000f072/watershedwc_swe.json"></script>
+	<script type="text/javascript" src="file:///G:/Shared%20drives/CW3E%20Snow/Ryoko/2021_webmap/img/Oroville/201702040000f072/watershedwc_sweYF.json"></script>
+	<script type="text/javascript" src="file:///G:/Shared%20drives/CW3E%20Snow/Ryoko/2021_webmap/img/Oroville/201702040000f072/updated_time.json"></script>
+
+	<style>
+		  html, body, #map-canvas {
+	          margin: 0px;
+	          padding: 0px
+		  }
+		  body {
+			  font-family:verdana,arial,sans-serif;
+			  font-size:10pt;
+			  margin:10px;
+			  background-color:#eaeaea;
+			  }
+		  #tab {
+			  font-family:"Trebuchet MS", Arial, Helvetica, sans-serif;
+			  border-collapse:collapse;
+			  font-size:1em;
+			  }
+		  a:link{color:#1e6b8b;    text-decoration: none;}
+		  a:visited{color:#1e6b8b;    text-decoration: none;}
+		  a:hover{color:#1e6b8b;    text-decoration: none;}
+	      p{font-size:10px}
+		  #tab th {
+			  font-size:1.1em;
+			  text-align:center;
+			  padding-top:5px;
+			  padding-bottom:5px;
+			  background-color:#eaeaea;
+			  color:#ffffff;
+			  }
+		     #footer {
+		  	font-size:0.9em;
+		  	color:#ffffff;
+	 		background-color:#1e6b8b;
+		  }
+	          #tableg {font-size:10px}
+		</style>
+		<style>
+			#map {}
+	.infos { padding: 6px 8px; font: 14px/14px Arial, Helvetica, sans-serif; background: white; background: rgba(255,255,255,0.8); box-shadow: 0 0 15px rgba(0,0,0,0.2); border-radius: 5px; } .info h4 { margin: 0 0 5px; color: #777; }
+	.legend { text-align: left; font: 10px, line-height: 18px; color: #555; } .legend i { width: 18px; height: 18px; float: left; margin-right: 8px; opacity: 0.7; }
+	        a.leaflet-control-zoom-in { color: black; }
+	        a.leaflet-control-zoom-out { color: black; }
+	}</style>
+
+</head>
+
+
+<body>
+<h1>2017 Oroville Event (72-hr Forecast)</h1>
+<div id="mapid" style="width: 1500px; height: 900px;"></div>
+
+<script>
+
+	// input path
+	var in_path1 = 'file:///G:/Shared%20drives/CW3E%20Snow/Ryoko/2021_webmap/img/Oroville/201702040000f072/';
+	var in_path2 = 'file:///G:/Shared%20drives/CW3E%20Snow/Ryoko/2021_webmap/img/Oroville/201702050000f072/';
+	var in_path3 = 'file:///G:/Shared%20drives/CW3E%20Snow/Ryoko/2021_webmap/img/Oroville/201702060000f072/';
+	var in_path4 = 'file:///G:/Shared%20drives/CW3E%20Snow/Ryoko/2021_webmap/img/Oroville/201702070000f072/';
+
+  // Create a map
+	var mymap = L.map('mapid').setView([39.5, -122.2], 8);
+
+	// Add maps
+	// base maps
+	var baseblack = L.tileLayer('https://cartodb-basemaps-{s}.global.ssl.fastly.net/dark_all/{z}/{x}/{y}.png', {attribution: 'J. Cordeira; R. Araki; Map: <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="http://cartodb.com/attributions">CartoDB</a>',
+	}).addTo(mymap);
+	var basewhite = L.tileLayer('https://stamen-tiles-{s}.a.ssl.fastly.net/toner-lite/{z}/{x}/{y}{r}.png', {attribution: 'J. Cordeira; R. Araki; Map: <a href="http://stamen.com">Stamen Design</a>',});
+	var basegreen = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {attribution: 'J. Cordeira; R. Araki; Map: <a href="http://openstreetmap.org">OpenStreetMap</a>'});
+
+	// Add HUC8 watersheds
+	function styleg(feature) {
+	return {
+		weight: 0.5,
+		opacity: 1,
+		color: 'yellow',
+		dashArray: '0',
+		fillOpacity: 0,
+		fillColor: 'white',
+	};
+	}
+
+	function highlightFeatureg(e) {
+		var layer = e.target;
+		layer.setStyle({weight: 3, color: 'yellow', dashArray: '', fillOpacity: 0.7});
+		if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) {layer.bringToFront();}
+		info.update(layer.feature.properties);
+	}
+
+	function resetHighlightg(e) {
+		gwatersheds.resetStyle(e.target);
+		info.update();
+	}
+
+	function onEachFeatureg(feature, layer) {
+			layer.on('mouseout',resetHighlightg);
+			layer.on('mouseover',highlightFeatureg);
+			}
+
+	var gwatersheds;
+ 	gwatersheds = L.geoJSON(watersheds, {
+	 style: styleg,
+	 onEachFeature: onEachFeatureg
+ 	});
+
+	// Add Yuba and Feature highlights
+	function styles(feature) {
+	return {
+		weight: 2.5,
+		opacity: 1,
+		color: 'orange',
+		dashArray: '0',
+		fillOpacity: 0,
+		fillColor: 'white',
+	};
+	}
+
+	function highlightFeatures(e) {
+		var layer = e.target;
+		layer.setStyle({weight: 3, color: 'orange', dashArray: '', fillOpacity: 0.7});
+		if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) {layer.bringToFront();}
+		info.update(layer.feature.properties);
+	}
+
+	function resetHighlights(e) {
+		gwatersheds_selected.resetStyle(e.target);
+		info.update();
+	}
+
+	function onEachFeatures(feature, layer) {
+			layer.on('mouseout',resetHighlights);
+			layer.on('mouseover',highlightFeatures);
+			}
+
+	var gwatersheds_selected;
+	gwatersheds_selected = L.geoJSON(watersheds_selected, {
+	 style: styles,
+	 onEachFeature: onEachFeatures
+ }).addTo(mymap);
+
+
+  // data maps
+	var dUrl11 = in_path1 + 'uaswe.png';
+	var dUrl12 = in_path2 + 'uaswe.png';
+	var dUrl13 = in_path3 + 'uaswe.png';
+	var dUrl14 = in_path4 + 'uaswe.png';
+  imageBounds1 = [[49.916667938661355,-124.9999999999162], [24.08333450142182, -66.49999976461893]];
+  var ua1 = L.imageOverlay(dUrl11, imageBounds1, {transparent: true, opacity: 0.8});
+  var ua2 = L.imageOverlay(dUrl12, imageBounds1, {transparent: true, opacity: 0.8});
+  var ua3 = L.imageOverlay(dUrl13, imageBounds1, {transparent: true, opacity: 0.8});
+  var ua4 = L.imageOverlay(dUrl14, imageBounds1, {transparent: true, opacity: 0.8});
+	var swe_legend = L.control({position: 'bottomleft'});
+		swe_legend.onAdd = function(mymap) {
+		var div = L.DomUtil.create('div', 'info legend');
+					div.innerHTML += "<font color='white'><b>[inch]</b><br><img src='file:///G:/Shared%20drives/CW3E%20Snow/Ryoko/2021_webmap/img/Oroville/201702040000f072/swe_legend.png'><br><b><font color='white'>Snow Water Equivalent</font>"
+		return div;
+		};
+	// dont know how to make this part to be relative path yet
+
+	var dUrl21 = in_path1 + 'gfsfl.png';
+	var dUrl22 = in_path2 + 'gfsfl.png';
+	var dUrl23 = in_path3 + 'gfsfl.png';
+	var dUrl24 = in_path4 + 'gfsfl.png';
+  var gfs_fl1 = L.imageOverlay(dUrl21, imageBounds1, {transparent: true, opacity: 0.6});
+	var gfs_fl2 = L.imageOverlay(dUrl22, imageBounds1, {transparent: true, opacity: 0.6});
+	var gfs_fl3 = L.imageOverlay(dUrl23, imageBounds1, {transparent: true, opacity: 0.6});
+	var gfs_fl4 = L.imageOverlay(dUrl24, imageBounds1, {transparent: true, opacity: 0.6});
+	var fl_legend = L.control({position: 'bottomleft'});
+		fl_legend.onAdd = function(mymap) {
+		var div = L.DomUtil.create('div', 'info legend');
+					div.innerHTML += "<font color='white'><b>[m]</b><br><img src='file:///G:/Shared%20drives/CW3E%20Snow/Ryoko/2021_webmap/img/Oroville/201702040000f072/fl_legend.png'><br><b><font color='white'>Freezing level converted to geometric height</font>"
+		return div;
+		};
+
+	var dUrl4 = in_path1 + 'gtopo.png';
+	var gtopo30 = L.imageOverlay(dUrl4, imageBounds1, {transparent: true, opacity: 0.6});
+	var topo_legend = L.control({position: 'bottomleft'});
+		topo_legend.onAdd = function(mymap) {
+		var div = L.DomUtil.create('div', 'info legend');
+					div.innerHTML += "<font color='white'><b>[m]</b><br><img src='file:///G:/Shared%20drives/CW3E%20Snow/Ryoko/2021_webmap/img/Oroville/201702040000f072/topo_legend.png'><br><b><font color='white'>Digital Elevation Map</font>"
+		return div;
+		};
+
+	var dUrl51 = in_path1 + 'masked_swe_gfs.png';
+	var dUrl52 = in_path2 + 'masked_swe_gfs.png';
+	var dUrl53 = in_path3 + 'masked_swe_gfs.png';
+	var dUrl54 = in_path4 + 'masked_swe_gfs.png';
+	var snow_belowfl1 = L.imageOverlay(dUrl51, imageBounds1, {transparent: true, opacity: 0.8}).addTo(mymap);
+	var snow_belowfl2 = L.imageOverlay(dUrl52, imageBounds1, {transparent: true, opacity: 0.8});
+	var snow_belowfl3 = L.imageOverlay(dUrl53, imageBounds1, {transparent: true, opacity: 0.8});
+	var snow_belowfl4 = L.imageOverlay(dUrl54, imageBounds1, {transparent: true, opacity: 0.8});
+
+	var snow_belowfl_legend = L.control({position: 'bottomleft'});
+		snow_belowfl_legend.onAdd = function(mymap) {
+		var div = L.DomUtil.create('div', 'info legend');
+	        div.innerHTML += "<font color='white'><b>[inch]</b><br><img src='file:///G:/Shared%20drives/CW3E%20Snow/Ryoko/2021_webmap/img/Oroville/201702040000f072/masked_swe_legend.png'><br><b><font color='white'>Snow Water Equivalent</font>"
+		return div;
+		};
+
+ // Group the layers
+	var layerGroup_sbfl = L.layerGroup([snow_belowfl1, snow_belowfl2, snow_belowfl3, snow_belowfl4]);
+	var layerGroup_gfsfl = L.layerGroup([gfs_fl1, gfs_fl2, gfs_fl3, gfs_fl4]);
+
+	var baseLayer = {
+	    "Light Base": basegreen,
+	    "Dark Base": baseblack,
+	    "White Base": basewhite,
+  };
+
+	var overlayMaps = {
+		"HUC 8 watersheds": gwatersheds,
+		"Yuba and Feather Outline": gwatersheds_selected,
+		"GTOPO30<br><br><b>Uni. Arizona SWE:</b>": gtopo30,
+		"Day 1 (2017-02-07)  ": ua1,
+		"Day 4 (2017-02-10)<br><br><b>GFS Freezing level:</b>": ua4,
+		"Day 1 (2017-02-07)<br>": gfs_fl1,
+		"Day 2 (2017-02-08)<br>": gfs_fl2,
+		"Day 3 (2017-02-09)<br>": gfs_fl3,
+		"Day 4 (2017-02-10)<br><br><b>Snow below freezing level:</b>": gfs_fl4,
+		"Day 1 (2017-02-07)": snow_belowfl1,
+		"Day 2 (2017-02-08)": snow_belowfl2,
+		"Day 3 (2017-02-09)": snow_belowfl3,
+		"Day 4 (2017-02-10)": snow_belowfl4
+	};
+
+	L.control.layers(baseLayer,overlayMaps,{collapsed:false}).addTo(mymap);
+
+	// Add slider control
+	var sliderlegend = L.control({position: 'topleft'});
+	sliderlegend.onAdd = function(mymap) {
+		var div = L.DomUtil.create('div', 'info legend');
+		div.innerHTML += "<b><font color='white'>Slide to advance a day:"
+		return div;
+	};
+	sliderlegend.addTo(mymap);
+
+	var sliderControl = L.control.sliderControl({position: "topleft", layer: layerGroup_sbfl, pane: 'gfs', follow: 1});
+	mymap.addControl(sliderControl);
+	sliderControl.startSlider();
+
+	// Add legend
+	mymap.on('overlayadd', function (eventLayer) {
+		if (eventLayer.name === "Day 1 (2017-02-07)  " || eventLayer.name === "Day 4 (2017-02-10)<br><br><b>GFS Freezing level:</b>" || eventLayer.name === "Day 1 (2017-02-07)"
+				|| eventLayer.name === "Day 2 (2017-02-08)"	|| eventLayer.name === "Day 3 (2017-02-09)"	|| eventLayer.name === "Day 4 (2017-02-10)"){
+			swe_legend.addTo(mymap);
+			mymap.removeControl(fl_legend);
+			mymap.removeControl(topo_legend);
+		}
+		if (eventLayer.name === "Day 1 (2017-02-07)<br>"|| eventLayer.name === "Day 2 (2017-02-08)<br>" ||
+		eventLayer.name === "Day 3 (2017-02-09)<br>"|| eventLayer.name === "Day 4 (2017-02-10)<br><br><b>Snow below freezing level:</b>"){
+			fl_legend.addTo(mymap);
+			mymap.removeControl(swe_legend);
+			mymap.removeControl(topo_legend);
+		}
+		if (eventLayer.name === "GTOPO30<br><br><b>Uni. Arizona SWE:</b>"){
+			topo_legend.addTo(mymap);
+			mymap.removeControl(swe_legend);
+			mymap.removeControl(fl_legend);
+		}
+	});
+
+	// Add information pane
+	var info = L.control({position: 'topleft'});
+	info.onAdd  = function (mymap) {this._div = L.DomUtil.create('div', 'infos'); this.update(); return this._div;};
+	info.update = function (props) {this._div.innerHTML = '<align="right">'+  (props ?
+				'<b>' + props.name + '<br>' + props.swe_vol+ ' acre-feet </b><br>'+ update_time_swe + '<br>'+update_time_gfs
+				:'<b>Watershed Name<br>Volume of SWE below freezing level within the watershed (acre-feet) based on GFS Forecast</b><br>' + update_time_swe+'<br>'+update_time_gfs); };
+	info.addTo(mymap);
+
+</script>
+
+</body>
+</html>
