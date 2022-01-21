@@ -70,7 +70,7 @@
 <center>
 <h1>2017 Oroville Event (Analysis)</h1>
 
-<div id="mapid" style="width: 1000px; height: 800px;"></div>
+<div id="mapid" style="width: 1200px; height: 800px;"></div>
 
 <br>
 
@@ -206,7 +206,7 @@
 	var swe_legend = L.control({position: 'bottomleft'});
 		swe_legend.onAdd = function(mymap) {
 		var div = L.DomUtil.create('div', 'info legend');
-					div.innerHTML += "<font color='white'><b>[inch]</b><br><img src='file:///G:/Shared%20drives/CW3E%20Snow/Ryoko/2021_webmap/img/Oroville/201702070000f000/swe_legend.png'><br><b><font color='white'>Snow Water Equivalent</font>"
+					div.innerHTML += "<font color='white'><b>[inch]</b><br><img src='/img/Oroville/201702070000f000/swe_legend.png'><br><b><font color='white'>Snow Water Equivalent</font>"
 		return div;
 		};
 
@@ -224,7 +224,7 @@
 	var fl_legend = L.control({position: 'bottomleft'});
 		fl_legend.onAdd = function(mymap) {
 		var div = L.DomUtil.create('div', 'info legend');
-					div.innerHTML += "<font color='white'><b>[%Ensamble members with freezing level > elevation]</b><br><img src='file:///G:/Shared%20drives/CW3E%20Snow/Ryoko/2021_webmap/img/legend/wwrf_ensamble_fl_legend.png'><br><b><font color='white'>Freezing level</font>"
+					div.innerHTML += "<font color='white'><b>[%Ensamble members with freezing level > elevation]</b><br><img src='/img/legend/wwrf_ensamble_fl_legend.png'><br><b><font color='white'>Freezing level</font>"
 		return div;
 		};
 
@@ -233,7 +233,7 @@
 	var topo_legend = L.control({position: 'bottomleft'});
 		topo_legend.onAdd = function(mymap) {
 		var div = L.DomUtil.create('div', 'info legend');
-					div.innerHTML += "<font color='white'><b>[m]</b><br><img src='file:///G:/Shared%20drives/CW3E%20Snow/Ryoko/2021_webmap/img/Oroville/201702070000f000/topo_legend.png'><br><b><font color='white'>Digital Elevation Map</font>"
+					div.innerHTML += "<font color='white'><b>[m]</b><br><img src='/img/Oroville/201702070000f000/topo_legend.png'><br><b><font color='white'>Digital Elevation Map</font>"
 		return div;
 		};
 
@@ -262,7 +262,7 @@
 	var meltfac_legend = L.control({position: 'bottomleft'});
 		meltfac_legend.onAdd = function(mymap) {
 		var div = L.DomUtil.create('div', 'info legend');
-	        div.innerHTML += "<font color='white'><b>[mm/hr]</b><br><img src='file:///G:/Shared%20drives/CW3E%20Snow/Ryoko/2021_webmap/img/Oroville/201702070000f000/meltfac_legend.png'><br><b><font color='white'>Melt Factor</font>"
+	        div.innerHTML += "<font color='white'><b>[mm/hr]</b><br><img src='/img/Oroville/201702070000f000/meltfac_legend.png'><br><b><font color='white'>Melt Factor</font>"
 		return div;
 		};
 
