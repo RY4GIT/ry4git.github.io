@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>CAMELS Basin Shapes</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+        crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+        crossorigin=""></script>
+    <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/shpjs/6.1.0/shp.min.js"></script> -->
+    <style>
+        html, body {
+            height: 95%; /* Ensure html and body take full height */
+            margin: 0; 
+            padding: 0; /* Usually remove padding for full-page map container */
+            font-family: Helvetica, Arial, sans-serif; 
+        }
+        body { /* Body-specific padding can be re-added if needed around content *above* map */
+            padding-top: 10px; /* Keep the top padding for the title/search */
+        }
+        #map {
+            height: 95%; 
+            width: 100%; 
+            /* margin-left/right: auto; not needed if width is 100% of body */
+        }
+    </style>
+</head>
+<body>
+
+<h1 style="text-align: left; margin-left: 20px; margin-bottom: 15px;">Simple watershed browser &#x1F42B;</h1>
+
+<div id="search-container" style="margin-bottom: 10px; text-align: center;">
+    <input type="text" id="gaugeIdSearchInput" placeholder="Enter Gauge ID">
+    <button id="gaugeIdSearchButton">Search</button>
+</div>
+
+<div id="map"></div>
+
+<script>
+    var map = L.map('map').setView([39.8283, -98.5795], 4);
+    var osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    });
+    var esriSatelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+    });
+    osmLayer.addTo(map);
+    var baseMaps = {
+        "OpenStreetMap": osmLayer,
+        "Satellite": esriSatelliteLayer
+    };
+    var caravanCredit = 'Caravan (Kratzert et al., 2024) &copy; <a href="https://doi.org/10.5281/zenodo.10968468" target="_blank">DOI:10.5281/zenodo.10968468</a>';
+    map.attributionControl.addAttribution(caravanCredit);
+
+    var camelsPolygonsPath = '/shp/camels_us/shapes_simplified.geojson';
+    var camelsPointsPath = '/shp/camels_us/gauge_points.geojson';
+    var hysetsPolygonsPath = '/shp/hysets_us/shapes_simplified.geojson';
+    var hysetsPointsPath = '/shp/hysets_us/gauge_points.geojson';
+
+    var camelsDataGroup = L.layerGroup();
+    var hysetsDataGroup = L.layerGroup();
+    camelsDataGroup.addTo(map);
+
+    var camelsPolygonsGeoJsonLayer, camelsPointsGeoJsonLayer, hysetsPolygonsGeoJsonLayer, hysetsPointsGeoJsonLayer;
+    var lastSearchedLayer = null;
+
+    var allCamelsPolygonLayers = [], allCamelsPointLayers = [], allHysetsPolygonLayers = [], allHysetsPointLayers = [];
+
+    function getGaugeId(feature) {
+        if (feature && feature.properties && feature.properties["Gauge ID"]) {
+            return String(feature.properties["Gauge ID"]);
+        }
+        return null;
+    }
+
+    var defaultPolygonStyle = { color: "#539ed6", weight: 2, opacity: 1, fillColor: "#539ed6", fillOpacity: 0.2 };
+    var highlightPolygonStyle = { weight: 3, color: '#206ba3', fillColor: '#206ba3', fillOpacity: 0.5 };
+    var defaultPointStyle = { radius: 5, fillColor: "#539ed6", color: "#539ed6", weight: 1, opacity: 1, fillOpacity: 0.8 };
+    var highlightPointStyle = { radius: 5, fillColor: "#206ba3", color: "#206ba3", weight: 2, fillOpacity: 1 };
+    var defaultHysetsPolygonStyle = { color: "#c3d2bd", weight: 2, opacity: 1, fillColor: "#d9ead3", fillOpacity: 0.1 };
+    var highlightHysetsPolygonStyle = { weight: 3, color: '#4e544b', fillColor: '#828c7e', fillOpacity: 0.5 };
+    var defaultHysetsPointStyle = { radius: 5, fillColor: "#c3d2bd", color: "#c3d2bd", weight: 1, opacity: 1, fillOpacity: 0.8 };
+    var highlightHysetsPointStyle = { radius: 5, fillColor: "#4e544b", color: "#4e544b", weight: 2, fillOpacity: 1 };
+
+    var overlayMaps = {
+        "CAMELS": camelsDataGroup,
+        "HYSETS": hysetsDataGroup
+    };
+    L.control.layers(baseMaps, overlayMaps, { collapsed: false }).addTo(map);
+
+    function performGaugeSearch() {
+        var searchTerm = document.getElementById('gaugeIdSearchInput').value.trim().toLowerCase();
+        if (!searchTerm) {
+            alert("Please enter a Gauge ID to search."); return;
+        }
+        if (!camelsPointsGeoJsonLayer) {
+            alert("CAMELS Gauge points layer has not loaded yet. Please wait and try again."); return;
+        }
+        var found = false;
+        if (lastSearchedLayer) {
+            lastSearchedLayer.setStyle(defaultPointStyle);
+            lastSearchedLayer = null;
+        }
+        camelsPointsGeoJsonLayer.eachLayer(function(layer) {
+            if (found) return;
+            if (layer.feature && layer.feature.properties) {
+                var gaugeIdProperty = layer.feature.properties["Gauge ID"];
+                if (gaugeIdProperty) {
+                    var gaugeIdString = String(gaugeIdProperty).toLowerCase();
+                    if (gaugeIdString.includes(searchTerm)) {
+                        map.setView(layer.getLatLng(), 12);
+                        layer.setStyle(highlightPointStyle);
+                        layer.openPopup();
+                        lastSearchedLayer = layer;
+                        found = true;
+                    }
+                }
+            }
+        });
+        if (!found) {
+            alert("Gauge ID not found or does not match the search criteria.");
+        }
+    }
+
+    // --- Data Loading Sections (CAMELS Polygons, CAMELS Points, HYSETS Polygons, HYSETS Points) ---
+    // These sections remain unchanged and are assumed to be here.
+    // For brevity, only the structure is implied.
+
+    fetch(camelsPolygonsPath)
+        .then(response => {
+            if (!response.ok) throw new Error('Network response was not ok for CAMELS Polygons: ' + response.status + ' ' + response.statusText + ' for ' + camelsPolygonsPath);
+            return response.json();
+        })
+        .then(function(polygonData) {
+            if (polygonData) {
+                camelsPolygonsGeoJsonLayer = L.geoJSON(polygonData, {
+                    style: defaultPolygonStyle, 
+                    onEachFeature: function (feature, layer) {
+                        allCamelsPolygonLayers.push(layer); 
+                        var currentFeatureGaugeId = getGaugeId(feature);
+                        if (feature.properties) {
+                            let popupContent = '<pre>';
+                            for (const key in feature.properties) {
+                                let value = feature.properties[key];
+                                popupContent += `${key}: ${typeof value === 'number' ? value.toFixed(1) : value}\n`;
+                            }
+                            popupContent += '</pre>';
+                            layer.bindPopup(popupContent);
+                        } else { layer.bindPopup('No properties for this CAMELS polygon.'); }
+                        layer.on({
+                            mouseover: function (e) {
+                                e.target.setStyle(highlightPolygonStyle); 
+                                e.target.bringToFront();
+                                if (currentFeatureGaugeId) {
+                                    allCamelsPointLayers.forEach(function(pointLayer) {
+                                        if (getGaugeId(pointLayer.feature) === currentFeatureGaugeId) {
+                                            pointLayer.setStyle(highlightPointStyle);
+                                            pointLayer.bringToFront();
+                                        }
+                                    });
+                                    allHysetsPointLayers.forEach(function(pointLayer) {
+                                        if (getGaugeId(pointLayer.feature) === currentFeatureGaugeId) {
+                                            pointLayer.setStyle(highlightHysetsPointStyle);
+                                            pointLayer.bringToFront();
+                                        }
+                                    });
+                                }
+                            },
+                            mouseout: function (e) { 
+                                camelsPolygonsGeoJsonLayer.resetStyle(e.target); 
+                                if (currentFeatureGaugeId) {
+                                    allCamelsPointLayers.forEach(function(pointLayer) {
+                                        if (getGaugeId(pointLayer.feature) === currentFeatureGaugeId && pointLayer !== lastSearchedLayer) {
+                                            pointLayer.setStyle(defaultPointStyle);
+                                        }
+                                    });
+                                    allHysetsPointLayers.forEach(function(pointLayer) {
+                                        if (getGaugeId(pointLayer.feature) === currentFeatureGaugeId) {
+                                            pointLayer.setStyle(defaultHysetsPointStyle);
+                                        }
+                                    });
+                                }
+                            }
+                        });
+                    }
+                });
+                camelsPolygonsGeoJsonLayer.addTo(camelsDataGroup); 
+                console.log("CAMELS Polygons loaded");
+            } else { console.error("Could not load/parse CAMELS Polygon GeoJSON."); alert("Error CAMELS Polygons. Check console."); }
+        })
+        .catch(function(error) { console.error("Error CAMELS Polygons:", error); alert("Error CAMELS Polygons: " + error.message); });
+
+    fetch(camelsPointsPath)
+        .then(response => {
+            if (!response.ok) throw new Error('Network response was not ok for CAMELS Points: ' + response.status + ' ' + response.statusText + ' for ' + camelsPointsPath);
+            return response.json();
+        })
+        .then(function(pointData) {
+            if (pointData) {
+                camelsPointsGeoJsonLayer = L.geoJSON(pointData, {
+                    pointToLayer: function (feature, latlng) { return L.circleMarker(latlng, defaultPointStyle); }, 
+                    onEachFeature: function (feature, layer) {
+                        allCamelsPointLayers.push(layer); 
+                        var currentFeatureGaugeId = getGaugeId(feature);
+                        if (feature.properties) {
+                            let popupContent = '<pre>';
+                            for (const key in feature.properties) {
+                                let value = feature.properties[key];
+                                popupContent += `${key}: ${typeof value === 'number' ? value.toFixed(1) : value}\n`;
+                            }
+                            popupContent += '</pre>';
+                            layer.bindPopup(popupContent);
+                        } else { layer.bindPopup('No properties for this CAMELS point.'); }
+                        layer.on({
+                            mouseover: function (e) { 
+                                e.target.setStyle(highlightPointStyle); 
+                                e.target.bringToFront();
+                                if (currentFeatureGaugeId) {
+                                    allCamelsPolygonLayers.forEach(function(polyLayer) {
+                                        if (getGaugeId(polyLayer.feature) === currentFeatureGaugeId) {
+                                            polyLayer.setStyle(highlightPolygonStyle);
+                                            polyLayer.bringToFront();
+                                        }
+                                    });
+                                    allHysetsPolygonLayers.forEach(function(polyLayer) {
+                                        if (getGaugeId(polyLayer.feature) === currentFeatureGaugeId) {
+                                            polyLayer.setStyle(highlightHysetsPolygonStyle);
+                                            polyLayer.bringToFront();
+                                        }
+                                    });
+                                }
+                            },
+                            mouseout: function (e) { 
+                                if (e.target !== lastSearchedLayer) e.target.setStyle(defaultPointStyle); 
+                                if (currentFeatureGaugeId) {
+                                    allCamelsPolygonLayers.forEach(function(polyLayer) {
+                                        if (getGaugeId(polyLayer.feature) === currentFeatureGaugeId) {
+                                            camelsPolygonsGeoJsonLayer.resetStyle(polyLayer);
+                                        }
+                                    });
+                                    allHysetsPolygonLayers.forEach(function(polyLayer) {
+                                        if (getGaugeId(polyLayer.feature) === currentFeatureGaugeId) {
+                                            hysetsPolygonsGeoJsonLayer.resetStyle(polyLayer);
+                                        }
+                                    });
+                                }
+                            }
+                        });
+                    }
+                });
+                camelsPointsGeoJsonLayer.addTo(camelsDataGroup); 
+                console.log("CAMELS Points loaded");
+            } else { console.error("Could not load/parse CAMELS Point GeoJSON."); alert("Error CAMELS Points. Check console."); }
+        })
+        .catch(function(error) { console.error("Error CAMELS Points:", error); alert("Error CAMELS Points: " + error.message); });
+
+    fetch(hysetsPolygonsPath)
+        .then(response => {
+            if (!response.ok) throw new Error('Network response was not ok for HYSETS Polygons: ' + response.status + ' ' + response.statusText + ' for ' + hysetsPolygonsPath);
+            return response.json();
+        })
+        .then(function(polygonData) {
+            if (polygonData) {
+                hysetsPolygonsGeoJsonLayer = L.geoJSON(polygonData, {
+                    style: defaultHysetsPolygonStyle, 
+                    onEachFeature: function (feature, layer) {
+                        allHysetsPolygonLayers.push(layer); 
+                        var currentFeatureGaugeId = getGaugeId(feature);
+                        if (feature.properties) {
+                            let popupContent = '<pre>';
+                            for (const key in feature.properties) {
+                                let value = feature.properties[key];
+                                popupContent += `${key}: ${typeof value === 'number' ? value.toFixed(1) : value}\n`;
+                            }
+                            popupContent += '</pre>';
+                            layer.bindPopup(popupContent);
+                        } else { layer.bindPopup('No properties for this HYSETS polygon.'); }
+                        layer.on({
+                            mouseover: function (e) { 
+                                e.target.setStyle(highlightHysetsPolygonStyle); 
+                                e.target.bringToFront();
+                                var hoveredHysetsPolygonId = getGaugeId(feature);
+                                console.log("Hovered HYSETS Polygon Gauge ID:", hoveredHysetsPolygonId);
+
+                                if (hoveredHysetsPolygonId) {
+                                    allCamelsPointLayers.forEach(function(pointLayer) {
+                                        if (getGaugeId(pointLayer.feature) === hoveredHysetsPolygonId) {
+                                            pointLayer.setStyle(highlightPointStyle);
+                                            pointLayer.bringToFront();
+                                        }
+                                    });
+                                    allHysetsPointLayers.forEach(function(pointLayer) {
+                                        var hysetsPointId = getGaugeId(pointLayer.feature);
+                                        console.log("Comparing with HYSETS Point ID:", hysetsPointId);
+                                        if (hysetsPointId === hoveredHysetsPolygonId) {
+                                            console.log("Match found! Highlighting HYSETS point:", hysetsPointId);
+                                            pointLayer.setStyle(highlightHysetsPointStyle);
+                                            pointLayer.bringToFront();
+                                        }
+                                    });
+                                }
+                            },
+                            mouseout: function (e) { 
+                                hysetsPolygonsGeoJsonLayer.resetStyle(e.target); 
+                                var hoveredHysetsPolygonId = getGaugeId(feature);
+                                console.log("Mouseout HYSETS Polygon Gauge ID:", hoveredHysetsPolygonId);
+
+                                if (hoveredHysetsPolygonId) {
+                                    allCamelsPointLayers.forEach(function(pointLayer) {
+                                        if (getGaugeId(pointLayer.feature) === hoveredHysetsPolygonId && pointLayer !== lastSearchedLayer) {
+                                            pointLayer.setStyle(defaultPointStyle);
+                                        }
+                                    });
+                                    allHysetsPointLayers.forEach(function(pointLayer) {
+                                        var hysetsPointId = getGaugeId(pointLayer.feature);
+                                        console.log("Resetting check for HYSETS Point ID:", hysetsPointId);
+                                        if (hysetsPointId === hoveredHysetsPolygonId) {
+                                            console.log("Match found! Resetting HYSETS point:", hysetsPointId);
+                                            pointLayer.setStyle(defaultHysetsPointStyle);
+                                        }
+                                    });
+                                }
+                            }
+                        });
+                    }
+                });
+                hysetsPolygonsGeoJsonLayer.addTo(hysetsDataGroup); 
+                console.log("HYSETS Polygons loaded");
+            } else { console.error("Could not load/parse HYSETS Polygon GeoJSON."); alert("Error HYSETS Polygons. Check console."); }
+        })
+        .catch(function(error) { console.error("Error HYSETS Polygons:", error); alert("Error HYSETS Polygons: " + error.message); });
+
+    fetch(hysetsPointsPath)
+        .then(response => {
+            if (!response.ok) throw new Error('Network response was not ok for HYSETS Points: ' + response.status + ' ' + response.statusText + ' for ' + hysetsPointsPath);
+            return response.json();
+        })
+        .then(function(pointData) {
+            if (pointData) {
+                hysetsPointsGeoJsonLayer = L.geoJSON(pointData, {
+                    pointToLayer: function (feature, latlng) { return L.circleMarker(latlng, defaultHysetsPointStyle); }, 
+                    onEachFeature: function (feature, layer) {
+                        allHysetsPointLayers.push(layer); 
+                        var currentFeatureGaugeId = getGaugeId(feature);
+                        if (feature.properties) {
+                            let popupContent = '<pre>';
+                            for (const key in feature.properties) {
+                                let value = feature.properties[key];
+                                popupContent += `${key}: ${typeof value === 'number' ? value.toFixed(1) : value}\n`;
+                            }
+                            popupContent += '</pre>';
+                            layer.bindPopup(popupContent);
+                        } else { layer.bindPopup('No properties for this HYSETS point.'); }
+                        layer.on({
+                            mouseover: function (e) { 
+                                e.target.setStyle(highlightHysetsPointStyle); 
+                                e.target.bringToFront();
+                                if (currentFeatureGaugeId) {
+                                    allCamelsPolygonLayers.forEach(function(polyLayer) {
+                                        if (getGaugeId(polyLayer.feature) === currentFeatureGaugeId) {
+                                            polyLayer.setStyle(highlightPolygonStyle);
+                                            polyLayer.bringToFront();
+                                        }
+                                    });
+                                    allHysetsPolygonLayers.forEach(function(polyLayer) {
+                                        if (getGaugeId(polyLayer.feature) === currentFeatureGaugeId) {
+                                            polyLayer.setStyle(highlightHysetsPolygonStyle);
+                                            polyLayer.bringToFront();
+                                        }
+                                    });
+                                }
+                            },
+                            mouseout: function (e) { 
+                                e.target.setStyle(defaultHysetsPointStyle); 
+                                if (currentFeatureGaugeId) {
+                                    allCamelsPolygonLayers.forEach(function(polyLayer) {
+                                        if (getGaugeId(polyLayer.feature) === currentFeatureGaugeId) {
+                                            camelsPolygonsGeoJsonLayer.resetStyle(polyLayer);
+                                        }
+                                    });
+                                    allHysetsPolygonLayers.forEach(function(polyLayer) {
+                                        if (getGaugeId(polyLayer.feature) === currentFeatureGaugeId) {
+                                            hysetsPolygonsGeoJsonLayer.resetStyle(polyLayer);
+                                        }
+                                    });
+                                }
+                            }
+                        });
+                    }
+                });
+                hysetsPointsGeoJsonLayer.addTo(hysetsDataGroup); 
+                console.log("HYSETS Points loaded");
+            } else { console.error("Could not load/parse HYSETS Point GeoJSON."); alert("Error HYSETS Points. Check console."); }
+        })
+        .catch(function(error) { console.error("Error HYSETS Points:", error); alert("Error HYSETS Points: " + error.message); });
+
+    document.getElementById('gaugeIdSearchButton').addEventListener('click', performGaugeSearch);
+
+</script>
+
+</body>
+</html>
+

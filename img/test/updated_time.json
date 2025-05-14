@@ -1,4 +1,0 @@
-var update_time_swe = 'UA SWE data is as of: 2021-01-22 00:00'; 
-var update_time_gfs = 'GFS 3-hr Forecast is valid for 2021-01-22 21:00, initialized at 2021-01-22 18:00'; 
-var update_time_cnrfc = 'CNRFC 3-hr Forecast is valid for 2021-01-22 21:00, initialized at 2021-01-22 18:00'; 
-var update_time_wwrfg = 'West-WRF (vGFS) 72-hr Forecast is valid for 2021-01-25 18:00, initialized at 2021-01-22 18:00'; 
