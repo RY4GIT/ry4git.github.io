@@ -23,10 +23,27 @@
     // Initialize the map and set its view to some coordinates in the US and zoom level
     var map = L.map('map').setView([39.8283, -98.5795], 4); // Centered on USA
 
-    // Add a tile layer to the map (e.g., OpenStreetMap)
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    // Define OpenStreetMap tile layer
+    var osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-    }).addTo(map);
+    });
+
+    // Define Esri World Imagery tile layer
+    var esriSatelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+    });
+
+    // Add the default OpenStreetMap layer to the map
+    osmLayer.addTo(map);
+
+    // Create a base maps object
+    var baseMaps = {
+        "OpenStreetMap": osmLayer,
+        "Satellite": esriSatelliteLayer
+    };
+
+    // Add layer control to the map
+    L.control.layers(baseMaps).addTo(map);
 
     // Path to your GeoJSON file
     // IMPORTANT: Make sure this is a direct link to the raw GeoJSON file.
@@ -45,17 +62,16 @@
             if (data) {
                 L.geoJSON(data, { // Leaflet's L.geoJSON directly uses the GeoJSON object
                     onEachFeature: function (feature, layer) {
-                        // You can access properties from the GeoJSON feature.properties
-                        if (feature.properties && feature.properties.BASIN_ID) {
-                            layer.bindPopup('Basin ID: ' + feature.properties.BASIN_ID);
-                        } else if (feature.properties) {
-                            // If BASIN_ID is not present, show all properties
+                        // Display all properties from the GeoJSON feature.properties
+                        if (feature.properties) {
                             let popupContent = '<pre>';
                             for (const key in feature.properties) {
                                 popupContent += `${key}: ${feature.properties[key]}\n`;
                             }
                             popupContent += '</pre>';
                             layer.bindPopup(popupContent);
+                        } else {
+                            layer.bindPopup('No properties found for this feature.');
                         }
                     }
                 }).addTo(map);
