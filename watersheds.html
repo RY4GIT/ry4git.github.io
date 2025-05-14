@@ -50,6 +50,24 @@
     // For GitHub, this usually means clicking "Raw" on the file view and using that URL.
     var geojsonPath = 'https://raw.githubusercontent.com/RY4GIT/ry4git.github.io/master/shp/camels_us/camels_basin_shapes_simplified.geojson';
 
+    var geojsonLayer; // Variable to store the GeoJSON layer
+
+    // Define styles
+    var defaultStyle = {
+        color: "#3388ff", // Stroke color
+        weight: 2,        // Stroke width
+        opacity: 1,       // Stroke opacity
+        fillColor: "#3388ff", // Fill color
+        fillOpacity: 0.2  // Fill opacity
+    };
+
+    var highlightStyle = {
+        weight: 3,
+        color: '#ff7800',
+        fillColor: '#ff7800',
+        fillOpacity: 0.5
+    };
+
     // Use fetch to load the GeoJSON file
     fetch(geojsonPath)
         .then(response => {
@@ -60,7 +78,8 @@
         })
         .then(function(data) { // 'data' here is the parsed GeoJSON object
             if (data) {
-                L.geoJSON(data, { // Leaflet's L.geoJSON directly uses the GeoJSON object
+                geojsonLayer = L.geoJSON(data, { // Assign to geojsonLayer
+                    style: defaultStyle, // Apply the default style to all features
                     onEachFeature: function (feature, layer) {
                         // Display all properties from the GeoJSON feature.properties
                         if (feature.properties) {
@@ -73,6 +92,20 @@
                         } else {
                             layer.bindPopup('No properties found for this feature.');
                         }
+
+                        // Add mouseover and mouseout events
+                        layer.on({
+                            mouseover: function (e) {
+                                var hoveredLayer = e.target;
+                                hoveredLayer.setStyle(highlightStyle);
+                                if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) {
+                                    hoveredLayer.bringToFront();
+                                }
+                            },
+                            mouseout: function (e) {
+                                geojsonLayer.resetStyle(e.target); // Reset to default style defined in L.geoJSON
+                            }
+                        });
                     }
                 }).addTo(map);
                 console.log("GeoJSON loaded and added to map:", data);
