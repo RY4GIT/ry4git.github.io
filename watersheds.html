@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>CAMELS Basin Shapes</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+        crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+        crossorigin=""></script>
+    <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/shpjs/6.1.0/shp.min.js"></script> -->
+    <style>
+        #map { height: 600px; }
+    </style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<script>
+    // Initialize the map and set its view to some coordinates in the US and zoom level
+    var map = L.map('map').setView([39.8283, -98.5795], 4); // Centered on USA
+
+    // Define OpenStreetMap tile layer
+    var osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    });
+
+    // Define Esri World Imagery tile layer
+    var esriSatelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+    });
+
+    // Add the default OpenStreetMap layer to the map
+    osmLayer.addTo(map);
+
+    // Create a base maps object
+    var baseMaps = {
+        "OpenStreetMap": osmLayer,
+        "Satellite": esriSatelliteLayer
+    };
+
+    // Add layer control to the map
+    L.control.layers(baseMaps).addTo(map);
+
+    // Path to your GeoJSON file
+    // IMPORTANT: Make sure this is a direct link to the raw GeoJSON file.
+    // For GitHub, this usually means clicking "Raw" on the file view and using that URL.
+    var geojsonPath = 'https://raw.githubusercontent.com/RY4GIT/ry4git.github.io/master/shp/camels_us/camels_basin_shapes_simplified.geojson';
+
+    var geojsonLayer; // Variable to store the GeoJSON layer
+
+    // Define styles
+    var defaultStyle = {
+        color: "#3388ff", // Stroke color
+        weight: 2,        // Stroke width
+        opacity: 1,       // Stroke opacity
+        fillColor: "#3388ff", // Fill color
+        fillOpacity: 0.2  // Fill opacity
+    };
+
+    var highlightStyle = {
+        weight: 3,
+        color: '#ff7800',
+        fillColor: '#ff7800',
+        fillOpacity: 0.5
+    };
+
+    // Use fetch to load the GeoJSON file
+    fetch(geojsonPath)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok: ' + response.status + ' ' + response.statusText + ' for ' + geojsonPath);
+            }
+            return response.json(); // This parses the response body as JSON
+        })
+        .then(function(data) { // 'data' here is the parsed GeoJSON object
+            if (data) {
+                geojsonLayer = L.geoJSON(data, { // Assign to geojsonLayer
+                    style: defaultStyle, // Apply the default style to all features
+                    onEachFeature: function (feature, layer) {
+                        // Display all properties from the GeoJSON feature.properties
+                        if (feature.properties) {
+                            let popupContent = '<pre>';
+                            for (const key in feature.properties) {
+                                popupContent += `${key}: ${feature.properties[key]}\n`;
+                            }
+                            popupContent += '</pre>';
+                            layer.bindPopup(popupContent);
+                        } else {
+                            layer.bindPopup('No properties found for this feature.');
+                        }
+
+                        // Add mouseover and mouseout events
+                        layer.on({
+                            mouseover: function (e) {
+                                var hoveredLayer = e.target;
+                                hoveredLayer.setStyle(highlightStyle);
+                                if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) {
+                                    hoveredLayer.bringToFront();
+                                }
+                            },
+                            mouseout: function (e) {
+                                geojsonLayer.resetStyle(e.target); // Reset to default style defined in L.geoJSON
+                            }
+                        });
+                    }
+                }).addTo(map);
+                console.log("GeoJSON loaded and added to map:", data);
+            } else {
+                console.error("Could not load or parse GeoJSON. Data is null or undefined after fetch.");
+                alert("Could not load or parse GeoJSON. Data is null or undefined. Check console for details.");
+            }
+        })
+        .catch(function(error) {
+            console.error("Error loading or processing GeoJSON:", error);
+            alert("Error loading GeoJSON. Check the console for details. Ensure the URL is correct, accessible, and points to a valid GeoJSON file: " + geojsonPath + "\nError: " + error.message);
+        });
+
+</script>
+
+</body>
+</html>
