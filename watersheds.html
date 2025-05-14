@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>CAMELS Basin Shapes</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+        crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+        crossorigin=""></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/shpjs/6.1.0/shp.min.js"></script>
+    <style>
+        #map { height: 600px; }
+    </style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<script>
+    // Initialize the map and set its view to some coordinates in the US and zoom level
+    var map = L.map('map').setView([39.8283, -98.5795], 4); // Centered on USA
+
+    // Add a tile layer to the map (e.g., OpenStreetMap)
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(map);
+
+    // Path to your shapefile
+    // IMPORTANT: Make sure 'camels_us_camels_basin_shapes_simplified.shp' and any associated files (e.g., .dbf, .shx)
+    // are in the same directory as this HTML file, or provide the correct relative path.
+    var shapefilePath = 'camels_us_camels_basin_shapes_simplified.shp';
+
+    // Use shp.js to load the shapefile
+    // shp.js returns a promise
+    shp(shapefilePath).then(function(geojson){
+        // geojson should be a GeoJSON FeatureCollection
+        if (geojson) {
+            L.geoJSON(geojson, {
+                onEachFeature: function (feature, layer) {
+                    // You can access properties from the .dbf file here
+                    // For example, if your .dbf has a 'BASIN_ID' field:
+                    if (feature.properties && feature.properties.BASIN_ID) {
+                        layer.bindPopup('Basin ID: ' + feature.properties.BASIN_ID);
+                    } else if (feature.properties) {
+                        // If BASIN_ID is not present, show all properties
+                        let popupContent = '<pre>';
+                        for (const key in feature.properties) {
+                            popupContent += `${key}: ${feature.properties[key]}\n`;
+                        }
+                        popupContent += '</pre>';
+                        layer.bindPopup(popupContent);
+                    }
+                }
+            }).addTo(map);
+            console.log("Shapefile loaded and added to map:", geojson);
+        } else {
+            console.error("Could not load or parse shapefile. GeoJSON data is null or undefined.");
+        }
+    }).catch(function(error) {
+        console.error("Error loading shapefile:", error);
+        alert("Error loading shapefile. Check the console for details and ensure the .shp, .dbf, and .shx files are present and accessible at: " + shapefilePath);
+    });
+
+</script>
+
+</body>
+</html>
