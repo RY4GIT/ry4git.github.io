@@ -10,7 +10,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
         integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
         crossorigin=""></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/shpjs/6.1.0/shp.min.js"></script>
+    <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/shpjs/6.1.0/shp.min.js"></script> -->
     <style>
         #map { height: 600px; }
     </style>
@@ -28,41 +28,47 @@
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
     }).addTo(map);
 
-    // Path to your shapefile
-    // IMPORTANT: Make sure 'camels_us_camels_basin_shapes_simplified.shp' and any associated files (e.g., .dbf, .shx)
-    // are in the same directory as this HTML file, or provide the correct relative path.
-    var shapefilePath = 'https://github.com/RY4GIT/ry4git.github.io/blob/master/shp/camels_us/camels_basin_shapes_simplified.shp';
+    // Path to your GeoJSON file
+    // IMPORTANT: Make sure this is a direct link to the raw GeoJSON file.
+    // For GitHub, this usually means clicking "Raw" on the file view and using that URL.
+    var geojsonPath = 'REPLACE_WITH_YOUR_DIRECT_GEOJSON_FILE_URL.geojson';
 
-    // Use shp.js to load the shapefile
-    // shp.js returns a promise
-    shp(shapefilePath).then(function(geojson){
-        // geojson should be a GeoJSON FeatureCollection
-        if (geojson) {
-            L.geoJSON(geojson, {
-                onEachFeature: function (feature, layer) {
-                    // You can access properties from the .dbf file here
-                    // For example, if your .dbf has a 'BASIN_ID' field:
-                    if (feature.properties && feature.properties.BASIN_ID) {
-                        layer.bindPopup('Basin ID: ' + feature.properties.BASIN_ID);
-                    } else if (feature.properties) {
-                        // If BASIN_ID is not present, show all properties
-                        let popupContent = '<pre>';
-                        for (const key in feature.properties) {
-                            popupContent += `${key}: ${feature.properties[key]}\n`;
+    // Use fetch to load the GeoJSON file
+    fetch(geojsonPath)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok: ' + response.status + ' ' + response.statusText + ' for ' + geojsonPath);
+            }
+            return response.json(); // This parses the response body as JSON
+        })
+        .then(function(data) { // 'data' here is the parsed GeoJSON object
+            if (data) {
+                L.geoJSON(data, { // Leaflet's L.geoJSON directly uses the GeoJSON object
+                    onEachFeature: function (feature, layer) {
+                        // You can access properties from the GeoJSON feature.properties
+                        if (feature.properties && feature.properties.BASIN_ID) {
+                            layer.bindPopup('Basin ID: ' + feature.properties.BASIN_ID);
+                        } else if (feature.properties) {
+                            // If BASIN_ID is not present, show all properties
+                            let popupContent = '<pre>';
+                            for (const key in feature.properties) {
+                                popupContent += `${key}: ${feature.properties[key]}\n`;
+                            }
+                            popupContent += '</pre>';
+                            layer.bindPopup(popupContent);
                         }
-                        popupContent += '</pre>';
-                        layer.bindPopup(popupContent);
                     }
-                }
-            }).addTo(map);
-            console.log("Shapefile loaded and added to map:", geojson);
-        } else {
-            console.error("Could not load or parse shapefile. GeoJSON data is null or undefined.");
-        }
-    }).catch(function(error) {
-        console.error("Error loading shapefile:", error);
-        alert("Error loading shapefile. Check the console for details and ensure the .shp, .dbf, and .shx files are present and accessible at: " + shapefilePath);
-    });
+                }).addTo(map);
+                console.log("GeoJSON loaded and added to map:", data);
+            } else {
+                console.error("Could not load or parse GeoJSON. Data is null or undefined after fetch.");
+                alert("Could not load or parse GeoJSON. Data is null or undefined. Check console for details.");
+            }
+        })
+        .catch(function(error) {
+            console.error("Error loading or processing GeoJSON:", error);
+            alert("Error loading GeoJSON. Check the console for details. Ensure the URL is correct, accessible, and points to a valid GeoJSON file: " + geojsonPath + "\nError: " + error.message);
+        });
 
 </script>
 
