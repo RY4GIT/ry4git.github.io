@@ -42,7 +42,7 @@
 <script>
     var map = L.map('map').setView([39.8283, -98.5795], 4);
     var osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
     });
     var esriSatelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
         attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
@@ -52,7 +52,7 @@
         "OpenStreetMap": osmLayer,
         "Satellite": esriSatelliteLayer
     };
-    var caravanCredit = 'Caravan (Kratzert et al., 2024) &copy; <a href="https://doi.org/10.5281/zenodo.10968468" target="_blank">DOI:10.5281/zenodo.10968468</a>';
+    var caravanCredit = 'Data from Caravan v1.4 (Kratzert et al., 2024) &copy; <a href="https://doi.org/10.5281/zenodo.10968468" target="_blank">DOI:10.5281/zenodo.10968468</a> and GAGES-II (Falcone et al., 2010) &copy; <a href="https://doi.org/10.3133/70046617" target="_blank">DOI:10.3133/70046617</a>'; 
     map.attributionControl.addAttribution(caravanCredit);
 
     var camelsPolygonsPath = '/shp/camels_us/shapes_simplified.geojson';
@@ -160,25 +160,23 @@
                         } else { layer.bindPopup('No properties for this CAMELS polygon.'); }
                         layer.on({
                             mouseover: function (e) {
+                                var feature = e.target.feature;
+                                var currentFeatureGaugeId = getGaugeId(feature);
                                 e.target.setStyle(highlightPolygonStyle); 
-                                e.target.bringToFront();
                                 if (currentFeatureGaugeId) {
                                     allCamelsPointLayers.forEach(function(pointLayer) {
                                         if (getGaugeId(pointLayer.feature) === currentFeatureGaugeId) {
                                             pointLayer.setStyle(highlightPointStyle);
-                                            pointLayer.bringToFront();
                                         }
                                     });
                                     allHysetsPointLayers.forEach(function(pointLayer) {
                                         if (getGaugeId(pointLayer.feature) === currentFeatureGaugeId) {
                                             pointLayer.setStyle(highlightHysetsPointStyle);
-                                            pointLayer.bringToFront();
                                         }
                                     });
                                     allGagesiiPointLayers.forEach(function(pointLayer) {
                                         if (getGaugeId(pointLayer.feature) === currentFeatureGaugeId) {
                                             pointLayer.setStyle(highlightGagesiiPointStyle);
-                                            pointLayer.bringToFront();
                                         }
                                     });
                                 }
@@ -235,25 +233,22 @@
                         } else { layer.bindPopup('No properties for this CAMELS point.'); }
                         layer.on({
                             mouseover: function (e) { 
+                                var feature = e.target.feature;
                                 e.target.setStyle(highlightPointStyle); 
-                                e.target.bringToFront();
                                 if (currentFeatureGaugeId) {
                                     allCamelsPolygonLayers.forEach(function(polyLayer) {
                                         if (getGaugeId(polyLayer.feature) === currentFeatureGaugeId) {
                                             polyLayer.setStyle(highlightPolygonStyle);
-                                            polyLayer.bringToFront();
                                         }
                                     });
                                     allHysetsPolygonLayers.forEach(function(polyLayer) {
                                         if (getGaugeId(polyLayer.feature) === currentFeatureGaugeId) {
                                             polyLayer.setStyle(highlightHysetsPolygonStyle);
-                                            polyLayer.bringToFront();
                                         }
                                     });
                                     allGagesiiPolygonLayers.forEach(function(polyLayer) {
                                         if (getGaugeId(polyLayer.feature) === currentFeatureGaugeId) {
                                             polyLayer.setStyle(highlightGagesiiPolygonStyle);
-                                            polyLayer.bringToFront();
                                         }
                                     });
                                 }
@@ -310,31 +305,25 @@
                         } else { layer.bindPopup('No properties for this HYSETS polygon.'); }
                         layer.on({
                             mouseover: function (e) { 
+                                var feature = e.target.feature;
                                 e.target.setStyle(highlightHysetsPolygonStyle); 
-                                e.target.bringToFront();
-                                var hoveredHysetsPolygonId = getGaugeId(feature);
-                                console.log("Hovered HYSETS Polygon Gauge ID:", hoveredHysetsPolygonId);
-
-                                if (hoveredHysetsPolygonId) {
+                                if (currentFeatureGaugeId) {
                                     allCamelsPointLayers.forEach(function(pointLayer) {
-                                        if (getGaugeId(pointLayer.feature) === hoveredHysetsPolygonId) {
+                                        if (getGaugeId(pointLayer.feature) === currentFeatureGaugeId) {
                                             pointLayer.setStyle(highlightPointStyle);
-                                            pointLayer.bringToFront();
                                         }
                                     });
                                     allHysetsPointLayers.forEach(function(pointLayer) {
                                         var hysetsPointId = getGaugeId(pointLayer.feature);
                                         console.log("Comparing with HYSETS Point ID:", hysetsPointId);
-                                        if (hysetsPointId === hoveredHysetsPolygonId) {
+                                        if (hysetsPointId === currentFeatureGaugeId) {
                                             console.log("Match found! Highlighting HYSETS point:", hysetsPointId);
                                             pointLayer.setStyle(highlightHysetsPointStyle);
-                                            pointLayer.bringToFront();
                                         }
                                     });
                                     allGagesiiPointLayers.forEach(function(pointLayer) {
-                                        if (getGaugeId(pointLayer.feature) === hoveredHysetsPolygonId) {
+                                        if (getGaugeId(pointLayer.feature) === currentFeatureGaugeId) {
                                             pointLayer.setStyle(highlightGagesiiPointStyle);
-                                            pointLayer.bringToFront();
                                         }
                                     });
                                 }
@@ -397,25 +386,22 @@
                         } else { layer.bindPopup('No properties for this HYSETS point.'); }
                         layer.on({
                             mouseover: function (e) { 
+                                var feature = e.target.feature;
                                 e.target.setStyle(highlightHysetsPointStyle); 
-                                e.target.bringToFront();
                                 if (currentFeatureGaugeId) {
                                     allCamelsPolygonLayers.forEach(function(polyLayer) {
                                         if (getGaugeId(polyLayer.feature) === currentFeatureGaugeId) {
                                             polyLayer.setStyle(highlightPolygonStyle);
-                                            polyLayer.bringToFront();
                                         }
                                     });
                                     allHysetsPolygonLayers.forEach(function(polyLayer) {
                                         if (getGaugeId(polyLayer.feature) === currentFeatureGaugeId) {
                                             polyLayer.setStyle(highlightHysetsPolygonStyle);
-                                            polyLayer.bringToFront();
                                         }
                                     });
                                     allGagesiiPolygonLayers.forEach(function(polyLayer) {
                                         if (getGaugeId(polyLayer.feature) === currentFeatureGaugeId) {
                                             polyLayer.setStyle(highlightGagesiiPolygonStyle);
-                                            polyLayer.bringToFront();
                                         }
                                     });
                                 }
@@ -472,25 +458,22 @@
                         } else { layer.bindPopup('No properties for this GAGES-II polygon.'); }
                         layer.on({
                             mouseover: function (e) { 
+                                var feature = e.target.feature;
                                 e.target.setStyle(highlightGagesiiPolygonStyle); 
-                                e.target.bringToFront();
                                 if (currentFeatureGaugeId) {
                                     allCamelsPointLayers.forEach(function(pointLayer) {
                                         if (getGaugeId(pointLayer.feature) === currentFeatureGaugeId) {
                                             pointLayer.setStyle(highlightPointStyle);
-                                            pointLayer.bringToFront();
                                         }
                                     });
                                     allHysetsPointLayers.forEach(function(pointLayer) {
                                         if (getGaugeId(pointLayer.feature) === currentFeatureGaugeId) {
                                             pointLayer.setStyle(highlightHysetsPointStyle);
-                                            pointLayer.bringToFront();
                                         }
                                     });
                                     allGagesiiPointLayers.forEach(function(pointLayer) {
                                         if (getGaugeId(pointLayer.feature) === currentFeatureGaugeId) {
                                             pointLayer.setStyle(highlightGagesiiPointStyle);
-                                            pointLayer.bringToFront();
                                         }
                                     });
                                 }
@@ -547,25 +530,22 @@
                         } else { layer.bindPopup('No properties for this GAGES-II point.'); }
                         layer.on({
                             mouseover: function (e) { 
+                                var feature = e.target.feature;
                                 e.target.setStyle(highlightGagesiiPointStyle); 
-                                e.target.bringToFront();
                                 if (currentFeatureGaugeId) {
                                     allCamelsPolygonLayers.forEach(function(polyLayer) {
                                         if (getGaugeId(polyLayer.feature) === currentFeatureGaugeId) {
                                             polyLayer.setStyle(highlightPolygonStyle);
-                                            polyLayer.bringToFront();
                                         }
                                     });
                                     allHysetsPolygonLayers.forEach(function(polyLayer) {
                                         if (getGaugeId(polyLayer.feature) === currentFeatureGaugeId) {
                                             polyLayer.setStyle(highlightHysetsPolygonStyle);
-                                            polyLayer.bringToFront();
                                         }
                                     });
                                     allGagesiiPolygonLayers.forEach(function(polyLayer) {
                                         if (getGaugeId(polyLayer.feature) === currentFeatureGaugeId) {
                                             polyLayer.setStyle(highlightGagesiiPolygonStyle);
-                                            polyLayer.bringToFront();
                                         }
                                     });
                                 }
