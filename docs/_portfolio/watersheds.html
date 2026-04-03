@@ -18,18 +18,20 @@ excerpt: "Interactive Leaflet map to search and explore CAMELS, HYSETS, and GAGE
     <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/shpjs/6.1.0/shp.min.js"></script> -->
     <style>
         html, body {
-            height: 95%; /* Ensure html and body take full height */
-            margin: 0; 
-            padding: 0; /* Usually remove padding for full-page map container */
-            font-family: Helvetica, Arial, sans-serif; 
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            font-family: Helvetica, Arial, sans-serif;
         }
-        body { /* Body-specific padding can be re-added if needed around content *above* map */
-            padding-top: 10px; /* Keep the top padding for the title/search */
+        body {
+            padding-top: 10px;
+            box-sizing: border-box;
         }
+        /* Fixed height so Leaflet always has a non-zero container (percent heights often collapse). */
         #map {
-            height: 95%; 
-            width: 100%; 
-            /* margin-left/right: auto; not needed if width is 100% of body */
+            height: calc(100vh - 140px);
+            min-height: 360px;
+            width: 100%;
         }
     </style>
 </head>
@@ -60,12 +62,12 @@ excerpt: "Interactive Leaflet map to search and explore CAMELS, HYSETS, and GAGE
     var caravanCredit = 'Data from Caravan v1.4 (Kratzert et al., 2024) &copy; <a href="https://doi.org/10.5281/zenodo.10968468" target="_blank">DOI:10.5281/zenodo.10968468</a> and GAGES-II (Falcone et al., 2010) &copy; <a href="https://doi.org/10.3133/70046617" target="_blank">DOI:10.3133/70046617</a>'; 
     map.attributionControl.addAttribution(caravanCredit);
 
-    var camelsPolygonsPath = '../../assets/shp/camels_us/shapes_simplified.geojson';
-    var camelsPointsPath = '../../assets/shp/camels_us/gauge_points.geojson';
-    var hysetsPolygonsPath = '../../assets/shp/hysets_us/shapes_simplified.geojson';
-    var hysetsPointsPath = '../../assets/shp/hysets_us/gauge_points.geojson';
-    var gagesiiPolygonsPath = '../../assets/shp/gages2_us/shapes_simplified.geojson';
-    var gagesiiPointsPath = '../../assets/shp/gages2_us/gauge_points.geojson';
+    var camelsPolygonsPath = "{{ '/assets/shp/camels_us/shapes_simplified.geojson' | relative_url }}";
+    var camelsPointsPath = "{{ '/assets/shp/camels_us/gauge_points.geojson' | relative_url }}";
+    var hysetsPolygonsPath = "{{ '/assets/shp/hysets_us/shapes_simplified.geojson' | relative_url }}";
+    var hysetsPointsPath = "{{ '/assets/shp/hysets_us/gauge_points.geojson' | relative_url }}";
+    var gagesiiPolygonsPath = "{{ '/assets/shp/gages2_us/shapes_simplified.geojson' | relative_url }}";
+    var gagesiiPointsPath = "{{ '/assets/shp/gages2_us/gauge_points.geojson' | relative_url }}";
 
     var camelsDataGroup = L.layerGroup();
     var hysetsDataGroup = L.layerGroup();
