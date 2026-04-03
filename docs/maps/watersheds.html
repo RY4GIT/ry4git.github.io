@@ -35,7 +35,7 @@
 <h1 style="text-align: left; margin-left: 20px; margin-bottom: 15px;">Simple watershed browser &#x1F42B;</h1>
 
 <div id="search-container" style="margin-bottom: 10px; text-align: center;">
-    <input type="text" id="gaugeIdSearchInput" placeholder="Enter Gauge ID">
+    <input type="text" id="gaugeIdSearchInput" placeholder="Gauge ID (CAMELS, HYSETS, GAGES-II)">
     <button id="gaugeIdSearchButton">Search</button>
 </div>
 
@@ -101,20 +101,22 @@
     };
     L.control.layers(baseMaps, overlayMaps, { collapsed: false }).addTo(map);
 
-    function performGaugeSearch() {
-        var searchTerm = document.getElementById('gaugeIdSearchInput').value.trim().toLowerCase();
-        if (!searchTerm) {
-            alert("Please enter a Gauge ID to search."); return;
-        }
-        if (!camelsPointsGeoJsonLayer) {
-            alert("CAMELS Gauge points layer has not loaded yet. Please wait and try again."); return;
-        }
-        var found = false;
-        if (lastSearchedLayer) {
+    function resetLastSearchHighlight() {
+        if (!lastSearchedLayer) return;
+        if (allCamelsPointLayers.indexOf(lastSearchedLayer) !== -1) {
             lastSearchedLayer.setStyle(defaultPointStyle);
-            lastSearchedLayer = null;
+        } else if (allHysetsPointLayers.indexOf(lastSearchedLayer) !== -1) {
+            lastSearchedLayer.setStyle(defaultHysetsPointStyle);
+        } else if (allGagesiiPointLayers.indexOf(lastSearchedLayer) !== -1) {
+            lastSearchedLayer.setStyle(defaultGagesiiPointStyle);
         }
-        camelsPointsGeoJsonLayer.eachLayer(function(layer) {
+        lastSearchedLayer = null;
+    }
+
+    function trySearchPointLayer(geoJsonLayer, highlightStyle, searchTerm) {
+        if (!geoJsonLayer) return false;
+        var found = false;
+        geoJsonLayer.eachLayer(function(layer) {
             if (found) return;
             if (layer.feature && layer.feature.properties) {
                 var gaugeIdProperty = layer.feature.properties["Gauge ID"];
@@ -122,7 +124,7 @@
                     var gaugeIdString = String(gaugeIdProperty).toLowerCase();
                     if (gaugeIdString.includes(searchTerm)) {
                         map.setView(layer.getLatLng(), 12);
-                        layer.setStyle(highlightPointStyle);
+                        layer.setStyle(highlightStyle);
                         layer.openPopup();
                         lastSearchedLayer = layer;
                         found = true;
@@ -130,9 +132,28 @@
                 }
             }
         });
-        if (!found) {
-            alert("Gauge ID not found or does not match the search criteria.");
+        return found;
+    }
+
+    function performGaugeSearch() {
+        var searchTerm = document.getElementById('gaugeIdSearchInput').value.trim().toLowerCase();
+        if (!searchTerm) {
+            alert("Please enter a Gauge ID to search."); return;
         }
+        if (!camelsPointsGeoJsonLayer && !hysetsPointsGeoJsonLayer && !gagesiiPointsGeoJsonLayer) {
+            alert("Gauge point layers have not loaded yet. Please wait and try again."); return;
+        }
+        resetLastSearchHighlight();
+        if (trySearchPointLayer(camelsPointsGeoJsonLayer, highlightPointStyle, searchTerm)) return;
+        if (trySearchPointLayer(hysetsPointsGeoJsonLayer, highlightHysetsPointStyle, searchTerm)) {
+            if (!map.hasLayer(hysetsDataGroup)) hysetsDataGroup.addTo(map);
+            return;
+        }
+        if (trySearchPointLayer(gagesiiPointsGeoJsonLayer, highlightGagesiiPointStyle, searchTerm)) {
+            if (!map.hasLayer(gagesiiDataGroup)) gagesiiDataGroup.addTo(map);
+            return;
+        }
+        alert("Gauge ID not found or does not match the search criteria.");
     }
 
     // --- Data Loading Sections (CAMELS Polygons, CAMELS Points, HYSETS Polygons, HYSETS Points) ---
@@ -409,7 +430,7 @@
                                 }
                             },
                             mouseout: function (e) { 
-                                e.target.setStyle(defaultHysetsPointStyle); 
+                                if (e.target !== lastSearchedLayer) e.target.setStyle(defaultHysetsPointStyle); 
                                 if (currentFeatureGaugeId) {
                                     allCamelsPolygonLayers.forEach(function(polyLayer) {
                                         if (getGaugeId(polyLayer.feature) === currentFeatureGaugeId) {
@@ -553,7 +574,7 @@
                                 }
                             },
                             mouseout: function (e) { 
-                                e.target.setStyle(defaultGagesiiPointStyle); 
+                                if (e.target !== lastSearchedLayer) e.target.setStyle(defaultGagesiiPointStyle); 
                                 if (currentFeatureGaugeId) {
                                     allCamelsPolygonLayers.forEach(function(polyLayer) {
                                         if (getGaugeId(polyLayer.feature) === currentFeatureGaugeId) {
