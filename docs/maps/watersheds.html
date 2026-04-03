@@ -1,8 +1,3 @@
----
-layout: null
-title: "CAMELS basin shapes"
-excerpt: "Interactive Leaflet map to search and explore CAMELS, HYSETS, and GAGES-II watershed polygons and gauge points."
----
 <!DOCTYPE html>
 <html>
 <head>
@@ -62,12 +57,12 @@ excerpt: "Interactive Leaflet map to search and explore CAMELS, HYSETS, and GAGE
     var caravanCredit = 'Data from Caravan v1.4 (Kratzert et al., 2024) &copy; <a href="https://doi.org/10.5281/zenodo.10968468" target="_blank">DOI:10.5281/zenodo.10968468</a> and GAGES-II (Falcone et al., 2010) &copy; <a href="https://doi.org/10.3133/70046617" target="_blank">DOI:10.3133/70046617</a>'; 
     map.attributionControl.addAttribution(caravanCredit);
 
-    var camelsPolygonsPath = "{{ '/assets/shp/camels_us/shapes_simplified.geojson' | relative_url }}";
-    var camelsPointsPath = "{{ '/assets/shp/camels_us/gauge_points.geojson' | relative_url }}";
-    var hysetsPolygonsPath = "{{ '/assets/shp/hysets_us/shapes_simplified.geojson' | relative_url }}";
-    var hysetsPointsPath = "{{ '/assets/shp/hysets_us/gauge_points.geojson' | relative_url }}";
-    var gagesiiPolygonsPath = "{{ '/assets/shp/gages2_us/shapes_simplified.geojson' | relative_url }}";
-    var gagesiiPointsPath = "{{ '/assets/shp/gages2_us/gauge_points.geojson' | relative_url }}";
+    var camelsPolygonsPath = '../assets/shp/camels_us/shapes_simplified.geojson';
+    var camelsPointsPath = '../assets/shp/camels_us/gauge_points.geojson';
+    var hysetsPolygonsPath = '../assets/shp/hysets_us/shapes_simplified.geojson';
+    var hysetsPointsPath = '../assets/shp/hysets_us/gauge_points.geojson';
+    var gagesiiPolygonsPath = '../assets/shp/gages2_us/shapes_simplified.geojson';
+    var gagesiiPointsPath = '../assets/shp/gages2_us/gauge_points.geojson';
 
     var camelsDataGroup = L.layerGroup();
     var hysetsDataGroup = L.layerGroup();

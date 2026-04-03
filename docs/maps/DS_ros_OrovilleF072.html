@@ -1,8 +1,3 @@
----
-layout: null
-title: "2017 Oroville event (72-hr forecast)"
-excerpt: "Interactive map of GFS freezing level, SWE, and related layers for the 72-hour Oroville forecast scenario."
----
 <!DOCTYPE html>
 <html>
 
@@ -21,9 +16,9 @@ excerpt: "Interactive map of GFS freezing level, SWE, and related layers for the
   <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
 	<script src="https://cw3e.ucsd.edu/DSMaps/js_plugins/SliderControl.js" type="text/javascript"></script>
 	<script src="https://cw3e.ucsd.edu/DSMaps/js_plugins/leaflet.groupedlayercontrol.js"></script>
-	<script type="text/javascript" src="{{ '/assets/img/Oroville/201702040000f072/watershedwc_swe.json' | relative_url }}"></script>
-	<script type="text/javascript" src="{{ '/assets/img/Oroville/201702040000f072/watershedwc_sweYF.json' | relative_url }}"></script>
-	<script type="text/javascript" src="{{ '/assets/img/Oroville/201702040000f072/updated_time.json' | relative_url }}"></script>
+	<script type="text/javascript" src="../assets/img/Oroville/201702040000f072/watershedwc_swe.json"></script>
+	<script type="text/javascript" src="../assets/img/Oroville/201702040000f072/watershedwc_sweYF.json"></script>
+	<script type="text/javascript" src="../assets/img/Oroville/201702040000f072/updated_time.json"></script>
 
 	<style>
 		  html, body, #map-canvas {
@@ -78,10 +73,10 @@ excerpt: "Interactive map of GFS freezing level, SWE, and related layers for the
 <script>
 
 	// input path
-	var in_path1 = "{{ '/assets/img/Oroville/201702040000f072/' | relative_url }}";
-	var in_path2 = "{{ '/assets/img/Oroville/201702050000f072/' | relative_url }}";
-	var in_path3 = "{{ '/assets/img/Oroville/201702060000f072/' | relative_url }}";
-	var in_path4 = "{{ '/assets/img/Oroville/201702070000f072/' | relative_url }}";
+	var in_path1 = '../assets/img/Oroville/201702040000f072/';
+	var in_path2 = '../assets/img/Oroville/201702050000f072/';
+	var in_path3 = '../assets/img/Oroville/201702060000f072/';
+	var in_path4 = '../assets/img/Oroville/201702070000f072/';
 
   // Create a map
 	var mymap = L.map('mapid').setView([39.5, -122.2], 8);
@@ -177,7 +172,7 @@ excerpt: "Interactive map of GFS freezing level, SWE, and related layers for the
 	var swe_legend = L.control({position: 'bottomleft'});
 		swe_legend.onAdd = function(mymap) {
 		var div = L.DomUtil.create('div', 'info legend');
-					div.innerHTML += "<font color='white'><b>[inch]</b><br><img src='../../assets/img/Oroville/201702040000f072/swe_legend.png'><br><b><font color='white'>Snow Water Equivalent</font>"
+					div.innerHTML += "<font color='white'><b>[inch]</b><br><img src='../assets/img/Oroville/201702040000f072/swe_legend.png'><br><b><font color='white'>Snow Water Equivalent</font>"
 		return div;
 		};
 
@@ -192,7 +187,7 @@ excerpt: "Interactive map of GFS freezing level, SWE, and related layers for the
 	var fl_legend = L.control({position: 'bottomleft'});
 		fl_legend.onAdd = function(mymap) {
 		var div = L.DomUtil.create('div', 'info legend');
-					div.innerHTML += "<font color='white'><b>[m]</b><br><img src='" + "{{ '/assets/img/Oroville/201702040000f072/fl_legend.png' | relative_url }}" + "'><br><b><font color='white'>Freezing level converted to geometric height</font>"
+					div.innerHTML += "<font color='white'><b>[m]</b><br><img src='../assets/img/Oroville/201702040000f072/fl_legend.png'><br><b><font color='white'>Freezing level converted to geometric height</font>"
 		return div;
 		};
 
@@ -201,7 +196,7 @@ excerpt: "Interactive map of GFS freezing level, SWE, and related layers for the
 	var topo_legend = L.control({position: 'bottomleft'});
 		topo_legend.onAdd = function(mymap) {
 		var div = L.DomUtil.create('div', 'info legend');
-					div.innerHTML += "<font color='white'><b>[m]</b><br><img src='" + "{{ '/assets/img/Oroville/201702040000f072/topo_legend.png' | relative_url }}" + "'><br><b><font color='white'>Digital Elevation Map</font>"
+					div.innerHTML += "<font color='white'><b>[m]</b><br><img src='../assets/img/Oroville/201702040000f072/topo_legend.png'><br><b><font color='white'>Digital Elevation Map</font>"
 		return div;
 		};
 
@@ -217,7 +212,7 @@ excerpt: "Interactive map of GFS freezing level, SWE, and related layers for the
 	var snow_belowfl_legend = L.control({position: 'bottomleft'});
 		snow_belowfl_legend.onAdd = function(mymap) {
 		var div = L.DomUtil.create('div', 'info legend');
-	        div.innerHTML += "<font color='white'><b>[inch]</b><br><img src='" + "{{ '/assets/img/Oroville/201702040000f072/masked_swe_legend.png' | relative_url }}" + "'><br><b><font color='white'>Snow Water Equivalent</font>"
+	        div.innerHTML += "<font color='white'><b>[inch]</b><br><img src='../assets/img/Oroville/201702040000f072/masked_swe_legend.png'><br><b><font color='white'>Snow Water Equivalent</font>"
 		return div;
 		};
 

@@ -1,8 +1,3 @@
----
-layout: null
-title: "2017 Oroville event (analysis)"
-excerpt: "Interactive map of snow below freezing level, West-WRF freezing level, melt factor, and University of Arizona SWE during the 2017 Oroville event."
----
 <!DOCTYPE html>
 <html>
 
@@ -21,9 +16,9 @@ excerpt: "Interactive map of snow below freezing level, West-WRF freezing level,
   <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
 	<script src="https://cw3e.ucsd.edu/DSMaps/js_plugins/SliderControl.js" type="text/javascript"></script>
 	<script src="https://cw3e.ucsd.edu/DSMaps/js_plugins/leaflet.groupedlayercontrol.js"></script>
-	<script type="text/javascript" src="{{ '/assets/img/Oroville/201702070000f000/watershedwc_swe.json' | relative_url }}"></script>
-	<script type="text/javascript" src="{{ '/assets/img/Oroville/201702070000f000/watershedwc_sweYF.json' | relative_url }}"></script>
-	<script type="text/javascript" src="{{ '/assets/img/Oroville/201702070000f000/updated_time.json' | relative_url }}"></script>
+	<script type="text/javascript" src="../assets/img/Oroville/201702070000f000/watershedwc_swe.json"></script>
+	<script type="text/javascript" src="../assets/img/Oroville/201702070000f000/watershedwc_sweYF.json"></script>
+	<script type="text/javascript" src="../assets/img/Oroville/201702070000f000/updated_time.json"></script>
 
 	<style>
 		  html, body, #map-canvas {
@@ -109,11 +104,11 @@ excerpt: "Interactive map of snow below freezing level, West-WRF freezing level,
 <script>
 
 	// input path
-	var in_path0 = "{{ '/assets/img/Oroville/201702050000f000/' | relative_url }}";
-	var in_path1 = "{{ '/assets/img/Oroville/201702060000f000/' | relative_url }}";
-	var in_path2 = "{{ '/assets/img/Oroville/201702070000f000/' | relative_url }}";
-	var in_path3 = "{{ '/assets/img/Oroville/201702080000f000/' | relative_url }}";
-	var in_path4 = "{{ '/assets/img/Oroville/201702090000f000/' | relative_url }}";
+	var in_path0 = '../assets/img/Oroville/201702050000f000/';
+	var in_path1 = '../assets/img/Oroville/201702060000f000/';
+	var in_path2 = '../assets/img/Oroville/201702070000f000/';
+	var in_path3 = '../assets/img/Oroville/201702080000f000/';
+	var in_path4 = '../assets/img/Oroville/201702090000f000/';
 
   	// Create a map
 	var mymap = L.map('mapid').setView([39.8, -121.0], 7);
@@ -211,7 +206,7 @@ excerpt: "Interactive map of snow below freezing level, West-WRF freezing level,
 	var swe_legend = L.control({position: 'bottomleft'});
 		swe_legend.onAdd = function(mymap) {
 		var div = L.DomUtil.create('div', 'info legend');
-					div.innerHTML += "<font color='white'><b>[inch]</b><br><img src='" + "{{ '/assets/img/Oroville/201702070000f000/swe_legend.png' | relative_url }}" + "'><br><b><font color='white'>Snow Water Equivalent</font>"
+					div.innerHTML += "<font color='white'><b>[inch]</b><br><img src='../assets/img/Oroville/201702070000f000/swe_legend.png'><br><b><font color='white'>Snow Water Equivalent</font>"
 		return div;
 		};
 
@@ -229,7 +224,7 @@ excerpt: "Interactive map of snow below freezing level, West-WRF freezing level,
 	var fl_legend = L.control({position: 'bottomleft'});
 		fl_legend.onAdd = function(mymap) {
 		var div = L.DomUtil.create('div', 'info legend');
-					div.innerHTML += "<font color='white'><b>[%Ensamble members with freezing level > elevation]</b><br><img src='" + "{{ '/assets/img/legend/wwrf_ensamble_fl_legend.png' | relative_url }}" + "'><br><b><font color='white'>Freezing level</font>"
+					div.innerHTML += "<font color='white'><b>[%Ensamble members with freezing level > elevation]</b><br><img src='../assets/img/legend/wwrf_ensamble_fl_legend.png'><br><b><font color='white'>Freezing level</font>"
 		return div;
 		};
 
@@ -238,7 +233,7 @@ excerpt: "Interactive map of snow below freezing level, West-WRF freezing level,
 	var topo_legend = L.control({position: 'bottomleft'});
 		topo_legend.onAdd = function(mymap) {
 		var div = L.DomUtil.create('div', 'info legend');
-					div.innerHTML += "<font color='white'><b>[m]</b><br><img src='" + "{{ '/assets/img/Oroville/201702070000f000/topo_legend.png' | relative_url }}" + "'><br><b><font color='white'>Digital Elevation Map</font>"
+					div.innerHTML += "<font color='white'><b>[m]</b><br><img src='../assets/img/Oroville/201702070000f000/topo_legend.png'><br><b><font color='white'>Digital Elevation Map</font>"
 		return div;
 		};
 
@@ -267,7 +262,7 @@ excerpt: "Interactive map of snow below freezing level, West-WRF freezing level,
 	var meltfac_legend = L.control({position: 'bottomleft'});
 		meltfac_legend.onAdd = function(mymap) {
 		var div = L.DomUtil.create('div', 'info legend');
-	        div.innerHTML += "<font color='white'><b>[mm/hr]</b><br><img src='" + "{{ '/assets/img/Oroville/201702070000f000/meltfac_legend.png' | relative_url }}" + "'><br><b><font color='white'>Melt Factor</font>"
+	        div.innerHTML += "<font color='white'><b>[mm/hr]</b><br><img src='../assets/img/Oroville/201702070000f000/meltfac_legend.png'><br><b><font color='white'>Melt Factor</font>"
 		return div;
 		};
 
