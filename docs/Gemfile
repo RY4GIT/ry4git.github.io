@@ -1,5 +1,11 @@
 source 'https://rubygems.org'
 
+# Ruby 3.4+ moved several libraries out of the default gem set; older Jekyll/Liquid still require them.
+gem 'csv'
+gem 'bigdecimal'
+# Windows (and some minimal Ruby installs): zoneinfo files are not in the OS path; Jekyll needs TZ data.
+gem 'tzinfo-data'
+
 group :jekyll_plugins do
   gem 'jekyll'
   gem 'jekyll-feed'
@@ -9,5 +15,6 @@ group :jekyll_plugins do
   gem 'webrick', '~> 1.8'
 end
 
+# github-pages 232+ pins Liquid 4.0.4 but requires Ruby < 4.0; stay on 223 for Ruby 4 and use _plugins/string_taint_shim.rb for Liquid 4.0.3.
 gem 'github-pages'
 gem 'connection_pool', '2.5.0'

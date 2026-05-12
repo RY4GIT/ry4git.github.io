@@ -7,4 +7,4 @@ redirect_from:
   - /about.html
 ---
 
-"rarakihydro.com is my main website but this is my third place to put my html stuffs"
+[rarakihydro.com](https://rarakihydro.com) is my main website but this is my third place to put my html stuffs
