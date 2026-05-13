@@ -110,7 +110,7 @@
     });
     osmLayer.addTo(map);
 
-    var caravanCredit = 'Data from Caravan v1.4 (Kratzert et al., 2024) &copy; <a href="https://doi.org/10.5281/zenodo.10968468" target="_blank" rel="noopener">DOI:10.5281/zenodo.10968468</a> and GAGES-II (Falcone et al., 2010) &copy; <a href="https://doi.org/10.3133/70046617" target="_blank" rel="noopener">DOI:10.3133/70046617</a>';
+    var caravanCredit = 'Watershed shapes from Caravan v1.4 (Kratzert et al., 2024) &copy; <a href="https://doi.org/10.5281/zenodo.10968468" target="_blank" rel="noopener">DOI:10.5281/zenodo.10968468</a> and GAGES-II (Falcone et al., 2010) &copy; <a href="https://doi.org/10.3133/70046617" target="_blank" rel="noopener">DOI:10.3133/70046617</a>; simplified for visualization.';
     map.attributionControl.addAttribution(caravanCredit);
 
     /* While a popup is open, disable map dragging so pointer moves do not pan the map (stuck drag). */
@@ -175,9 +175,49 @@
         if (code == null || code === '') return '—';
         var label = SOURCE_LABELS[code];
         if (label) {
-            return escapeHtml(label) + '</span>';
+            return '<br>' + escapeHtml(String(code)) + ' — ' + escapeHtml(label);
         }
         return escapeHtml(formatValue(code));
+    }
+
+    /* Units from signature / process table (EGUsphere preprint). */
+    var SIGNATURE_UNITS_BY_LAYER = {
+        'Baseflow': {
+            BFI: ' [-]',
+            BaseflowRecessionK: ' [1/day]'
+        },
+        'High storage capacity': {
+            RecessionParameters_b: ' [-]',
+            AverageStorage: ' [mm]'
+        },
+        'Water balance losses': {
+            TotalRR: ' [-]',
+            EventRR: ' [-]'
+        },
+        'Seasonal variability': {
+            VariabilityIndex: ' [-]',
+            Recession_a_Seasonality: ' [-]'
+        },
+        'Overland flow': {
+            avg_IE_SE_signif: ' [-]',
+            avg_IE_SE_thresh: ' [mm]',
+            SE_thresh_signif: ' [-]',
+            IE_thresh_signif: ' [-]',
+            IE_thresh: ' [mm]',
+            SE_thresh: ' [mm]'
+        },
+        'Overland flow type': {
+            R_Pint_RC: ' [-]',
+            R_Pvol_RC: ' [-]',
+            diff_RCPint_RCPvol: ' [-]'
+        }
+    };
+
+    function signatureValueHtml(layerLabel, propKey, rawValue) {
+        var unit = '';
+        var layerMap = SIGNATURE_UNITS_BY_LAYER[layerLabel];
+        if (layerMap && layerMap[propKey]) unit = layerMap[propKey];
+        return escapeHtml(formatValue(rawValue)) + escapeHtml(unit);
     }
 
     function colorFromProps(properties) {
@@ -196,7 +236,7 @@
             weight: 1.25,
             opacity: 0.95,
             fillColor: c,
-            fillOpacity: 0.3
+            fillOpacity: 0.2
         };
     }
 
@@ -216,13 +256,13 @@
             used[baseKey] = true;
             used[percKey] = true;
             parts.push('<p><strong>' + escapeHtml(baseKey) + '</strong><br>');
-            parts.push('Value: ' + escapeHtml(formatValue(props[baseKey])) + '<br>');
+            parts.push('Value: ' + signatureValueHtml(layerLabel, baseKey, props[baseKey]) + '<br>');
             parts.push('Percentile: ' + escapeHtml(formatPercentile(props[percKey])) + '</p>');
         });
 
         keys.forEach(function (k) {
             if (META_KEYS[k] || used[k] || k.slice(-5) === '_perc') return;
-            parts.push('<p><strong>' + escapeHtml(k) + '</strong>: ' + escapeHtml(formatValue(props[k])) + '</p>');
+            parts.push('<p><strong>' + escapeHtml(k) + '</strong>: ' + signatureValueHtml(layerLabel, k, props[k]) + '</p>');
         });
 
         parts.push('<div class="meta">');
@@ -243,19 +283,45 @@
     ];
 
     var overlayMaps = {};
-    var didFitBounds = false;
+    var initialExtentBounds = null;
+    var initialExtentRefitScheduled = false;
     var loadedSigLayers = [];
     var lastSearchHighlights = [];
 
-    function tryFitBounds(geojson) {
-        if (didFitBounds) return;
+    var INITIAL_FIT_OPTIONS = { padding: [40, 40] };
+
+    function applyInitialExtentFit() {
+        if (!initialExtentBounds || !initialExtentBounds.isValid()) return;
+        map.invalidateSize();
+        map.fitBounds(initialExtentBounds, INITIAL_FIT_OPTIONS);
+    }
+
+    function scheduleInitialExtentRefit() {
+        if (initialExtentRefitScheduled) return;
+        initialExtentRefitScheduled = true;
+        function afterLayout() {
+            applyInitialExtentFit();
+        }
+        requestAnimationFrame(function () {
+            requestAnimationFrame(afterLayout);
+        });
+        window.addEventListener('load', function onWinLoad() {
+            window.removeEventListener('load', onWinLoad);
+            setTimeout(afterLayout, 120);
+        });
+        setTimeout(afterLayout, 350);
+    }
+
+    /** Only Baseflow drives the initial extent so CDN/network order does not change zoom vs local. */
+    function trySetInitialExtentFromGeojson(geojson) {
+        if (initialExtentBounds) return;
         try {
             var tmp = L.geoJSON(geojson);
             var b = tmp.getBounds();
-            if (b.isValid()) {
-                didFitBounds = true;
-                map.fitBounds(b.pad(0.02));
-            }
+            if (!b.isValid()) return;
+            initialExtentBounds = b.pad(0.02);
+            applyInitialExtentFit();
+            scheduleInitialExtentRefit();
         } catch (e) { /* ignore */ }
     }
 
@@ -424,7 +490,9 @@
                 return response.json();
             })
             .then(function (data) {
-                tryFitBounds(data);
+                if (spec.label === 'Baseflow') {
+                    trySetInitialExtentFromGeojson(data);
+                }
 
                 var vtStyles = {};
                 vtStyles[vectorTileLayerName] = function (properties, zoom) {
