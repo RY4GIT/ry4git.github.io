@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Hydrologic signatures (US)</title>
+    <title>Dominant Processes Inferred from Hydrologic Signatures</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -10,6 +10,21 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
         integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
         crossorigin=""></script>
+    <!-- VectorGrid + geojson-vt (bundled): tiles only visible geometry for faster pan/zoom -->
+    <script src="https://cdn.jsdelivr.net/npm/leaflet.vectorgrid@1.3.0/dist/Leaflet.VectorGrid.bundled.js" crossorigin="anonymous"></script>
+    <script>
+        /* Leaflet 1.8+ removed L.DomEvent.fakeStop / _fakeStop; VectorGrid 1.3.x still calls it on
+           canvas tile clicks, which throws and prevents any feature click from firing. */
+        (function () {
+            if (!L || !L.DomEvent) return;
+            function fakeStop(e) {
+                if (e && e.stopPropagation) e.stopPropagation();
+                if (e && e.preventDefault) e.preventDefault();
+            }
+            if (typeof L.DomEvent.fakeStop !== 'function') L.DomEvent.fakeStop = fakeStop;
+            if (typeof L.DomEvent._fakeStop !== 'function') L.DomEvent._fakeStop = fakeStop;
+        })();
+    </script>
     <style>
         html, body {
             height: 100%;
@@ -22,9 +37,20 @@
             box-sizing: border-box;
         }
         #map {
-            height: calc(100vh - 120px);
+            height: calc(100vh - 270px);
             min-height: 360px;
             width: 100%;
+        }
+        .sig-citation {
+            margin: 0 20px 14px 20px;
+            max-width: 960px;
+            font-size: 13px;
+            line-height: 1.45;
+            color: #333;
+        }
+        .sig-citation a {
+            color: #1a5fb4;
+            word-break: break-all;
         }
         .sig-popup p {
             margin: 0.4em 0;
@@ -36,15 +62,44 @@
             border-top: 1px solid #ddd;
             font-size: 0.9em;
         }
+        .sig-bivariate-legend-wrap {
+            background: rgba(255, 255, 255, 0.96);
+            padding: 9px 11px;
+            border-radius: 4px;
+            box-shadow: 0 1px 5px rgba(0, 0, 0, 0.35);
+            max-width: min(360px, 48vw);
+            margin: 10px;
+            line-height: 1.2;
+        }
+        .sig-legend-images img {
+            display: block;
+            max-width: 100%;
+            height: auto;
+        }
+        .sig-legend-images img + img {
+            margin-top: 10px;
+        }
     </style>
 </head>
 <body>
 
-<h1 style="text-align: left; margin-left: 20px; margin-bottom: 12px;">Hydrologic signatures — interactive map</h1>
+<h1 style="text-align: left; margin-left: 20px; margin-bottom: 12px;"> &#127754 Dominant processes inferred from Hydrologic Signatures</h1>
+
+<p class="sig-citation">Araki, R., Holt, A., Hammond, J. C., Husic, A., Coxon, G., and McMillan, H. K.: <br>Continental-scale prediction of hydrologic signatures and processes,  <br> EGUsphere [preprint], <a href="https://doi.org/10.5194/egusphere-2025-6156" target="_blank" rel="noopener">https://doi.org/10.5194/egusphere-2025-6156</a>, 2025.</p>
+
+<div id="search-container" style="margin-bottom: 10px; text-align: center;">
+    <input type="text" id="gaugeIdSearchInput" placeholder="Gauge ID (substring match, e.g. camels_01013500)">
+    <button type="button" id="gaugeIdSearchButton">Search</button>
+</div>
 
 <div id="map"></div>
 
 <script>
+    if (typeof L === 'undefined' || !L.vectorGrid || !L.vectorGrid.slicer) {
+        document.getElementById('map').innerHTML = '<p style="padding:1em;">Leaflet.VectorGrid failed to load. Check the network or CDN.</p>';
+        throw new Error('Leaflet.VectorGrid unavailable');
+    }
+
     var map = L.map('map').setView([39.8283, -98.5795], 4);
 
     var osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -55,14 +110,34 @@
     });
     osmLayer.addTo(map);
 
+    var caravanCredit = 'Data from Caravan v1.4 (Kratzert et al., 2024) &copy; <a href="https://doi.org/10.5281/zenodo.10968468" target="_blank" rel="noopener">DOI:10.5281/zenodo.10968468</a> and GAGES-II (Falcone et al., 2010) &copy; <a href="https://doi.org/10.3133/70046617" target="_blank" rel="noopener">DOI:10.3133/70046617</a>';
+    map.attributionControl.addAttribution(caravanCredit);
+
+    /* While a popup is open, disable map dragging so pointer moves do not pan the map (stuck drag). */
+    map.on('popupopen', function () {
+        map.dragging.disable();
+    });
+    map.on('popupclose', function () {
+        map.dragging.enable();
+    });
+
     var baseMaps = {
         "OpenStreetMap": osmLayer,
         "Satellite": esriSatelliteLayer
     };
 
+    var SOURCE_LABELS = {
+        obs_Caravan: 'Observed (Caravan dataset)',
+        obs_GAGES2: 'Observed (GAGES-II dataset)',
+        pred_hys_gg2: 'Predicted (random forest, Caravan + GAGES-II attributes)',
+        pred_hys: 'Predicted (random forest, Caravan attributes)',
+        pred_gg2: 'Predicted (random forest, Caravan + GAGES-II attributes)'
+    };
+
     var META_KEYS = {
         gauge_id: true,
         gauge_num: true,
+        gauge_name: true,
         source: true,
         color: true,
         bivariate_class: true,
@@ -89,16 +164,39 @@
         return String(v);
     }
 
-    function polygonStyle(feature) {
-        var raw = feature && feature.properties && feature.properties.color;
+    function formatPercentile(v) {
+        if (v == null || v === '') return '—';
+        if (typeof v === 'number' && isFinite(v)) return v.toFixed(2);
+        return String(v);
+    }
+
+    function sourceDisplay(props) {
+        var code = props && props.source;
+        if (code == null || code === '') return '—';
+        var label = SOURCE_LABELS[code];
+        if (label) {
+            return escapeHtml(label) + '</span>';
+        }
+        return escapeHtml(formatValue(code));
+    }
+
+    function colorFromProps(properties) {
+        var raw = properties && properties.color;
         var c = (typeof raw === 'string' && raw.trim()) ? raw.trim() : '#3388ff';
         if (c.charAt(0) !== '#') c = '#' + c;
+        return c;
+    }
+
+    function pathStyleFromProps(properties) {
+        var c = colorFromProps(properties);
         return {
+            stroke: true,
+            fill: true,
             color: c,
             weight: 1.25,
             opacity: 0.95,
             fillColor: c,
-            fillOpacity: 0.42
+            fillOpacity: 0.3
         };
     }
 
@@ -119,7 +217,7 @@
             used[percKey] = true;
             parts.push('<p><strong>' + escapeHtml(baseKey) + '</strong><br>');
             parts.push('Value: ' + escapeHtml(formatValue(props[baseKey])) + '<br>');
-            parts.push('Percentile: ' + escapeHtml(formatValue(props[percKey])) + '</p>');
+            parts.push('Percentile: ' + escapeHtml(formatPercentile(props[percKey])) + '</p>');
         });
 
         keys.forEach(function (k) {
@@ -129,23 +227,25 @@
 
         parts.push('<div class="meta">');
         parts.push('<strong>gauge_id</strong>: ' + escapeHtml(formatValue(props.gauge_id)) + '<br>');
-        parts.push('<strong>source</strong>: ' + escapeHtml(formatValue(props.source)));
+        parts.push('<strong>gauge_name</strong>: ' + escapeHtml(formatValue(props.gauge_name)) + '<br>');
+        parts.push('<strong>source</strong>:' + sourceDisplay(props));
         parts.push('</div></div>');
         return parts.join('');
     }
 
     var layerSpecs = [
-        { label: 'Baseflow', path: '../assets/shp/sig_us/sigs_Baseflow.geojson' },
-        { label: 'High storage capacity', path: '../assets/shp/sig_us/sigs_HighStorageCapacity.geojson' },
-        { label: 'Overland flow', path: '../assets/shp/sig_us/sigs_OverlandFlow.geojson' },
-        { label: 'Overland flow type', path: '../assets/shp/sig_us/sigs_OverlandFlowType.geojson' },
-        { label: 'Seasonal variability', path: '../assets/shp/sig_us/sigs_SeasonalVariability.geojson' },
-        { label: 'Water balance losses', path: '../assets/shp/sig_us/sigs_WaterBalanceLosses.geojson' }
+        { label: 'Baseflow', path: '../assets/shp/sig_us/sigs_Baseflow.geojson', legend: '../assets/shp/sig_us/legend_baseflow.png', legendAlt: 'Baseflow (BFI × baseflow recession) bivariate legend' },
+        { label: 'High storage capacity', path: '../assets/shp/sig_us/sigs_HighStorageCapacity.geojson', legend: '../assets/shp/sig_us/legend_storage.png', legendAlt: 'High storage capacity bivariate legend' },
+        { label: 'Overland flow', path: '../assets/shp/sig_us/sigs_OverlandFlow.geojson', legend: '../assets/shp/sig_us/legend_overland.png', legendAlt: 'Overland flow bivariate legend' },
+        { label: 'Overland flow type', path: '../assets/shp/sig_us/sigs_OverlandFlowType.geojson', legend: '../assets/shp/sig_us/legend_overland_type.png', legendAlt: 'Overland flow type legend' },
+        { label: 'Seasonal variability', path: '../assets/shp/sig_us/sigs_SeasonalVariability.geojson', legend: '../assets/shp/sig_us/legend_season.png', legendAlt: 'Seasonal variability bivariate legend' },
+        { label: 'Water balance losses', path: '../assets/shp/sig_us/sigs_WaterBalanceLosses.geojson', legend: '../assets/shp/sig_us/legend_waterbalance.png', legendAlt: 'Water balance losses bivariate legend' }
     ];
 
     var overlayMaps = {};
     var didFitBounds = false;
-    var defaultOverlayChosen = false;
+    var loadedSigLayers = [];
+    var lastSearchHighlights = [];
 
     function tryFitBounds(geojson) {
         if (didFitBounds) return;
@@ -158,6 +258,159 @@
             }
         } catch (e) { /* ignore */ }
     }
+
+    function ringCentroid(ring) {
+        var x = 0, y = 0, n = ring.length;
+        if (!n) return null;
+        for (var i = 0; i < n; i++) {
+            x += ring[i][0];
+            y += ring[i][1];
+        }
+        return L.latLng(y / n, x / n);
+    }
+
+    function featureCentroidLatLng(feature) {
+        var g = feature && feature.geometry;
+        if (!g) return null;
+        if (g.type === 'Polygon') return ringCentroid(g.coordinates[0]);
+        if (g.type === 'MultiPolygon' && g.coordinates[0] && g.coordinates[0][0]) {
+            return ringCentroid(g.coordinates[0][0]);
+        }
+        return null;
+    }
+
+    function resetSearchHighlight() {
+        lastSearchHighlights.forEach(function (h) {
+            try {
+                h.vectorLayer.resetFeatureStyle(h.id);
+            } catch (err) { /* ignore */ }
+        });
+        lastSearchHighlights = [];
+    }
+
+    function highlightStyleFn(properties, zoom) {
+        var s = pathStyleFromProps(properties);
+        s.weight = 4;
+        s.opacity = 1;
+        s.fillOpacity = 0.55;
+        s.color = '#1a1a1a';
+        return s;
+    }
+
+    function hasActiveSigLayer() {
+        for (var li = 0; li < layerSpecs.length; li++) {
+            var g = overlayMaps[layerSpecs[li].label];
+            if (g && map.hasLayer(g)) return true;
+        }
+        return false;
+    }
+
+    var legendWrapEl = null;
+    var legendImagesEl = null;
+
+    function activeSignatureSpecs() {
+        var out = [];
+        for (var li = 0; li < layerSpecs.length; li++) {
+            var spec = layerSpecs[li];
+            var g = overlayMaps[spec.label];
+            if (g && map.hasLayer(g)) out.push(spec);
+        }
+        return out;
+    }
+
+    function updateSignatureLegendVisibility() {
+        if (!legendWrapEl || !legendImagesEl) return;
+        var active = activeSignatureSpecs();
+        if (!active.length) {
+            legendWrapEl.style.display = 'none';
+            return;
+        }
+        while (legendImagesEl.firstChild) {
+            legendImagesEl.removeChild(legendImagesEl.firstChild);
+        }
+        for (var i = 0; i < active.length; i++) {
+            var spec = active[i];
+            var im = L.DomUtil.create('img', '', legendImagesEl);
+            im.src = spec.legend;
+            im.alt = spec.legendAlt;
+        }
+        legendWrapEl.style.display = 'block';
+    }
+
+    function findGaugeMatch(searchTerm) {
+        var byLabel = {};
+        for (var u = 0; u < loadedSigLayers.length; u++) {
+            byLabel[loadedSigLayers[u].label] = loadedSigLayers[u];
+        }
+        for (var li = 0; li < layerSpecs.length; li++) {
+            var entry = byLabel[layerSpecs[li].label];
+            if (!entry || !entry.data || !entry.data.features) continue;
+            if (!map.hasLayer(entry.group)) continue;
+            var feats = entry.data.features;
+            for (var j = 0; j < feats.length; j++) {
+                var f = feats[j];
+                var gid = f.properties && f.properties.gauge_id;
+                if (gid != null && String(gid).toLowerCase().indexOf(searchTerm) !== -1) {
+                    return { entry: entry, feature: f, gaugeId: String(gid) };
+                }
+            }
+        }
+        return null;
+    }
+
+    function performGaugeSearch() {
+        var searchTerm = document.getElementById('gaugeIdSearchInput').value.trim().toLowerCase();
+        if (!searchTerm) {
+            alert('Please enter a gauge_id (or substring) to search.');
+            return;
+        }
+        if (!loadedSigLayers.length) {
+            alert('Layers have not finished loading yet. Please wait and try again.');
+            return;
+        }
+        if (!hasActiveSigLayer()) {
+            alert('Turn on at least one signature layer in the layer control, then search.');
+            return;
+        }
+
+        var match = findGaugeMatch(searchTerm);
+
+        if (!match) {
+            alert('No gauge_id matched in the visible (checked) layers.');
+            return;
+        }
+
+        resetSearchHighlight();
+
+        var ll = featureCentroidLatLng(match.feature);
+        if (ll) {
+            map.setView(ll, 12);
+        }
+
+        loadedSigLayers.forEach(function (L) {
+            if (!map.hasLayer(L.group)) return;
+            var has = false;
+            var feats = L.data && L.data.features;
+            if (!feats) return;
+            for (var k = 0; k < feats.length; k++) {
+                if (feats[k].properties && String(feats[k].properties.gauge_id) === match.gaugeId) {
+                    has = true;
+                    break;
+                }
+            }
+            if (!has) return;
+            L.vectorLayer.setFeatureStyle(match.gaugeId, highlightStyleFn);
+            lastSearchHighlights.push({ vectorLayer: L.vectorLayer, id: match.gaugeId });
+        });
+
+        var p = match.feature.properties;
+        L.popup({ maxWidth: 340, autoPan: true, keepInView: true })
+            .setLatLng(ll || map.getCenter())
+            .setContent(buildPopupHtml(match.entry.label, p))
+            .openOn(map);
+    }
+
+    var vectorTileLayerName = 'sliced';
 
     layerSpecs.forEach(function (spec) {
         var group = L.layerGroup();
@@ -172,18 +425,51 @@
             })
             .then(function (data) {
                 tryFitBounds(data);
-                L.geoJSON(data, {
-                    style: polygonStyle,
-                    onEachFeature: function (feature, layer) {
-                        layer.bindPopup(buildPopupHtml(spec.label, feature.properties));
-                    }
-                }).addTo(group);
 
-                if (!defaultOverlayChosen) {
-                    defaultOverlayChosen = true;
+                var vtStyles = {};
+                vtStyles[vectorTileLayerName] = function (properties, zoom) {
+                    return pathStyleFromProps(properties);
+                };
+
+                var vectorLayer = L.vectorGrid.slicer(data, {
+                    rendererFactory: L.canvas.tile,
+                    pane: 'overlayPane',
+                    interactive: true,
+                    vectorTileLayerName: vectorTileLayerName,
+                    getFeatureId: function (feat) {
+                        var g = feat.properties && feat.properties.gauge_id;
+                        return g != null && g !== '' ? String(g) : '_';
+                    },
+                    maxZoom: 16,
+                    tolerance: 3,
+                    buffer: 64,
+                    vectorTileLayerStyles: vtStyles
+                });
+
+                vectorLayer.on('click', function (e) {
+                    var lyr = e.layer || e.propagatedFrom;
+                    var props = lyr && (lyr.properties || lyr.feature && lyr.feature.properties);
+                    if (!props) return;
+                    L.popup({ maxWidth: 340, autoPan: true, keepInView: true })
+                        .setLatLng(e.latlng)
+                        .setContent(buildPopupHtml(spec.label, props))
+                        .openOn(map);
+                });
+
+                vectorLayer.addTo(group);
+
+                loadedSigLayers.push({
+                    group: group,
+                    vectorLayer: vectorLayer,
+                    data: data,
+                    label: spec.label
+                });
+
+                if (spec.label === 'Baseflow') {
                     group.addTo(map);
                 }
-                console.log('Loaded layer:', spec.label);
+                updateSignatureLegendVisibility();
+                console.log('Loaded vector layer:', spec.label);
             })
             .catch(function (err) {
                 console.error(err);
@@ -192,6 +478,25 @@
     });
 
     L.control.layers(baseMaps, overlayMaps, { collapsed: false }).addTo(map);
+
+    var signatureLegendControl = L.control({ position: 'bottomright' });
+    signatureLegendControl.onAdd = function () {
+        var div = L.DomUtil.create('div', 'sig-bivariate-legend-wrap');
+        div.style.display = 'none';
+        legendImagesEl = L.DomUtil.create('div', 'sig-legend-images', div);
+        L.DomEvent.disableClickPropagation(div);
+        L.DomEvent.disableScrollPropagation(div);
+        legendWrapEl = div;
+        return div;
+    };
+    signatureLegendControl.addTo(map);
+    map.on('overlayadd overlayremove', updateSignatureLegendVisibility);
+    updateSignatureLegendVisibility();
+
+    document.getElementById('gaugeIdSearchButton').addEventListener('click', performGaugeSearch);
+    document.getElementById('gaugeIdSearchInput').addEventListener('keydown', function (ev) {
+        if (ev.key === 'Enter') performGaugeSearch();
+    });
 </script>
 
 </body>
