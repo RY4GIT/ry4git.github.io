@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Hydrologic signatures (US)</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+        crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+        crossorigin=""></script>
+    <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            font-family: Helvetica, Arial, sans-serif;
+        }
+        body {
+            padding-top: 10px;
+            box-sizing: border-box;
+        }
+        #map {
+            height: calc(100vh - 120px);
+            min-height: 360px;
+            width: 100%;
+        }
+        .sig-popup p {
+            margin: 0.4em 0;
+            line-height: 1.35;
+        }
+        .sig-popup .meta {
+            margin-top: 0.6em;
+            padding-top: 0.5em;
+            border-top: 1px solid #ddd;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+
+<h1 style="text-align: left; margin-left: 20px; margin-bottom: 12px;">Hydrologic signatures — interactive map</h1>
+
+<div id="map"></div>
+
+<script>
+    var map = L.map('map').setView([39.8283, -98.5795], 4);
+
+    var osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+    });
+    var esriSatelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+    });
+    osmLayer.addTo(map);
+
+    var baseMaps = {
+        "OpenStreetMap": osmLayer,
+        "Satellite": esriSatelliteLayer
+    };
+
+    var META_KEYS = {
+        gauge_id: true,
+        gauge_num: true,
+        source: true,
+        color: true,
+        bivariate_class: true,
+        dominance: true,
+        order: true
+    };
+
+    function escapeHtml(s) {
+        if (s == null) return '';
+        return String(s)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    function formatValue(v) {
+        if (v == null || v === '') return '—';
+        if (typeof v === 'number' && isFinite(v)) {
+            if (Number.isInteger(v)) return String(v);
+            var t = v.toFixed(5);
+            return t.replace(/\.?0+$/, '');
+        }
+        return String(v);
+    }
+
+    function polygonStyle(feature) {
+        var raw = feature && feature.properties && feature.properties.color;
+        var c = (typeof raw === 'string' && raw.trim()) ? raw.trim() : '#3388ff';
+        if (c.charAt(0) !== '#') c = '#' + c;
+        return {
+            color: c,
+            weight: 1.25,
+            opacity: 0.95,
+            fillColor: c,
+            fillOpacity: 0.42
+        };
+    }
+
+    function buildPopupHtml(layerLabel, props) {
+        if (!props) return '<p>No properties</p>';
+        var keys = Object.keys(props);
+        var percKeys = keys.filter(function (k) { return k.length > 5 && k.slice(-5) === '_perc'; });
+        var used = {};
+
+        var parts = [];
+        parts.push('<div class="sig-popup">');
+        parts.push('<p><strong>' + escapeHtml(layerLabel) + '</strong></p>');
+
+        percKeys.forEach(function (percKey) {
+            var baseKey = percKey.slice(0, -5);
+            if (META_KEYS[baseKey] || META_KEYS[percKey]) return;
+            used[baseKey] = true;
+            used[percKey] = true;
+            parts.push('<p><strong>' + escapeHtml(baseKey) + '</strong><br>');
+            parts.push('Value: ' + escapeHtml(formatValue(props[baseKey])) + '<br>');
+            parts.push('Percentile: ' + escapeHtml(formatValue(props[percKey])) + '</p>');
+        });
+
+        keys.forEach(function (k) {
+            if (META_KEYS[k] || used[k] || k.slice(-5) === '_perc') return;
+            parts.push('<p><strong>' + escapeHtml(k) + '</strong>: ' + escapeHtml(formatValue(props[k])) + '</p>');
+        });
+
+        parts.push('<div class="meta">');
+        parts.push('<strong>gauge_id</strong>: ' + escapeHtml(formatValue(props.gauge_id)) + '<br>');
+        parts.push('<strong>source</strong>: ' + escapeHtml(formatValue(props.source)));
+        parts.push('</div></div>');
+        return parts.join('');
+    }
+
+    var layerSpecs = [
+        { label: 'Baseflow', path: '../assets/shp/sig_us/sigs_Baseflow.geojson' },
+        { label: 'High storage capacity', path: '../assets/shp/sig_us/sigs_HighStorageCapacity.geojson' },
+        { label: 'Overland flow', path: '../assets/shp/sig_us/sigs_OverlandFlow.geojson' },
+        { label: 'Overland flow type', path: '../assets/shp/sig_us/sigs_OverlandFlowType.geojson' },
+        { label: 'Seasonal variability', path: '../assets/shp/sig_us/sigs_SeasonalVariability.geojson' },
+        { label: 'Water balance losses', path: '../assets/shp/sig_us/sigs_WaterBalanceLosses.geojson' }
+    ];
+
+    var overlayMaps = {};
+    var didFitBounds = false;
+    var defaultOverlayChosen = false;
+
+    function tryFitBounds(geojson) {
+        if (didFitBounds) return;
+        try {
+            var tmp = L.geoJSON(geojson);
+            var b = tmp.getBounds();
+            if (b.isValid()) {
+                didFitBounds = true;
+                map.fitBounds(b.pad(0.02));
+            }
+        } catch (e) { /* ignore */ }
+    }
+
+    layerSpecs.forEach(function (spec) {
+        var group = L.layerGroup();
+        overlayMaps[spec.label] = group;
+
+        fetch(spec.path)
+            .then(function (response) {
+                if (!response.ok) {
+                    throw new Error(spec.path + ': ' + response.status + ' ' + response.statusText);
+                }
+                return response.json();
+            })
+            .then(function (data) {
+                tryFitBounds(data);
+                L.geoJSON(data, {
+                    style: polygonStyle,
+                    onEachFeature: function (feature, layer) {
+                        layer.bindPopup(buildPopupHtml(spec.label, feature.properties));
+                    }
+                }).addTo(group);
+
+                if (!defaultOverlayChosen) {
+                    defaultOverlayChosen = true;
+                    group.addTo(map);
+                }
+                console.log('Loaded layer:', spec.label);
+            })
+            .catch(function (err) {
+                console.error(err);
+                alert('Failed to load ' + spec.label + ': ' + err.message);
+            });
+    });
+
+    L.control.layers(baseMaps, overlayMaps, { collapsed: false }).addTo(map);
+</script>
+
+</body>
+</html>

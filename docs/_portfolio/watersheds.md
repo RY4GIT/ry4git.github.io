@@ -1,8 +1,8 @@
 ---
-title: "CAMELS basin shapes"
+title: "Dominant hydrologic processes"
 order: 2
-excerpt: "Interactive Leaflet map to search and explore CAMELS, HYSETS, and GAGES-II watershed polygons and gauge points."
-link: ../maps/watersheds.html
+excerpt: "Interactive Leaflet map to display estimated dominant hydrologic processes from streamflow patterns and hydrologic signature analysis. Includes both observed and predicted (random forest) signatures."
+link: ../maps/sig-prediction.html
 redirect_to:
-  - /maps/watersheds.html
+  - /maps/sig-prediction.html
 ---
