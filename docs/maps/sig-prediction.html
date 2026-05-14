@@ -430,8 +430,7 @@
     /* Matplotlib named colors */
     var MPL_ROYALBLUE = '#4169E1';
     var MPL_LIGHTCORAL = '#F08080';
-    var MPL_DIMGREY = '#696969';
-    /** Darker than MPL_DIMGREY — hatch diagonals read more clearly on fills. */
+    /** Hatch diagonal stroke in canvas pattern (readable on fills). */
     var MPL_DIMGREY_HATCH_STROKE = '#696969';
     var MPL_LIGHTGRAY = '#D3D3D3';
 
@@ -598,9 +597,7 @@
             s.weight = 2.75;
             s.opacity = 1;
         } else if (wbHatch) {
-            s.color = MPL_DIMGREY_HATCH_STROKE;
-            s.weight = 2.25;
-            s.opacity = 1;
+            s.stroke = false;
         }
 
         return s;
@@ -776,6 +773,9 @@
             var s = styleFn(properties, zoom);
             var hatch = waterBalanceLossesHatchActive(properties);
             var outlineOnly = !hatch && s.fillOpacity === 0;
+            if (hatch) {
+                s.stroke = true;
+            }
             s.weight = Math.max(s.weight || 1, 4);
             s.opacity = 1;
             s.color = '#b71c1c';
