@@ -76,8 +76,78 @@
             max-width: 100%;
             height: auto;
         }
-        .sig-legend-images img + img {
+        .sig-legend-images > * + * {
             margin-top: 10px;
+        }
+        .sig-legend-cross-process {
+            font-size: 12px;
+            line-height: 1.55;
+            color: #222;
+        }
+        .sig-legend-cross-process .sig-cp-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 4px;
+        }
+        .sig-legend-cross-process .sig-cp-row:first-child {
+            margin-top: 0;
+        }
+        .sig-legend-cross-process .sig-cp-sw {
+            flex: 0 0 28px;
+            height: 16px;
+            border: 1px solid rgba(0, 0, 0, 0.35);
+            box-sizing: border-box;
+        }
+        .sig-legend-cross-process .sig-cp-sw.sig-cp-fill-royalblue {
+            background: #4169E1;
+        }
+        .sig-legend-cross-process .sig-cp-sw.sig-cp-fill-lightcoral {
+            background: #F08080;
+        }
+        .sig-legend-cross-process .sig-cp-sw.sig-cp-outline-black {
+            background: transparent;
+            border: 2px solid #000;
+        }
+        .sig-legend-cross-process .sig-cp-sw.sig-cp-fill-blended {
+            background: linear-gradient(135deg, #4169E1 0%, #F08080 100%);
+        }
+        .sig-legend-cross-process .sig-cp-sw.sig-cp-fill-lightgray {
+            background: #D3D3D3;
+        }
+        .sig-legend-cross-process .sig-cp-sw.sig-cp-hatch-on-fill {
+            background-color: transparent;
+            background-image: repeating-linear-gradient(
+                -45deg,
+                transparent,
+                transparent 4px,
+                #3a3a3a 4px,
+                #3a3a3a 7px
+            );
+        }
+        .sig-popup .sig-dom-table {
+            border-collapse: collapse;
+            font-size: 0.92em;
+            margin: 0.5em 0 0 0;
+        }
+        .sig-popup .sig-dom-table td {
+            padding: 2px 8px 2px 0;
+            vertical-align: top;
+        }
+        .sig-popup .sig-popup-lay p {
+            margin: 0.35em 0;
+            line-height: 1.35;
+        }
+        .sig-popup .sig-cp-map-note {
+            font-size: 0.88em;
+            color: #555;
+        }
+        /* Layer control (top-right): line/spacing after Cross-process dominance, before Baseflow */
+        #map .leaflet-control-layers-overlays > label:first-of-type {
+            display: block;
+            padding-bottom: 10px;
+            margin-bottom: 10px;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.22);
         }
     </style>
 </head>
@@ -142,7 +212,13 @@
         color: true,
         bivariate_class: true,
         dominance: true,
-        order: true
+        order: true,
+        baseflow_dominance: true,
+        high_storage_capacity_dominance: true,
+        overland_flow_dominance: true,
+        water_balance_losses_dominance: true,
+        unclassified: true,
+        both_dominant: true
     };
 
     function escapeHtml(s) {
@@ -175,7 +251,7 @@
         if (code == null || code === '') return '—';
         var label = SOURCE_LABELS[code];
         if (label) {
-            return '<br>' + escapeHtml(String(code)) + ' — ' + escapeHtml(label);
+            return escapeHtml(label);
         }
         return escapeHtml(formatValue(code));
     }
@@ -240,6 +316,201 @@
         };
     }
 
+    /* Matplotlib named colors */
+    var MPL_ROYALBLUE = '#4169E1';
+    var MPL_LIGHTCORAL = '#F08080';
+    var MPL_DIMGREY = '#696969';
+    /** Darker than MPL_DIMGREY — hatch diagonals read more clearly on fills. */
+    var MPL_DIMGREY_HATCH_STROKE = '#696969';
+    var MPL_LIGHTGRAY = '#D3D3D3';
+
+    /** Cross-process: stronger fills for baseflow / overland / both_dominant (higher alpha). */
+    var CROSS_FILL_OPACITY_DOMINANT = 0.7;
+    var CROSS_FILL_OPACITY_UNCLASSIFIED = 0.1;
+    var CROSS_FILL_OPACITY_NEUTRAL = 0.1;
+    var CROSS_FILL_OPACITY_HATCH_DOMINANT = 0.48;
+    var CROSS_FILL_OPACITY_HATCH_OTHER = 0.28;
+
+    function hexToRgb(hex) {
+        var h = (hex || '').replace('#', '');
+        if (h.length === 3) {
+            h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+        }
+        if (h.length !== 6) return { r: 220, g: 220, b: 220 };
+        return {
+            r: parseInt(h.slice(0, 2), 16),
+            g: parseInt(h.slice(2, 4), 16),
+            b: parseInt(h.slice(4, 6), 16)
+        };
+    }
+
+    function rgbToHex(r, g, b) {
+        function x(n) {
+            var v = Math.round(Math.min(255, Math.max(0, n)));
+            var s = v.toString(16);
+            return s.length === 1 ? '0' + s : s;
+        }
+        return '#' + x(r) + x(g) + x(b);
+    }
+
+    function blendHexColors(hexA, hexB) {
+        var a = hexToRgb(hexA);
+        var b = hexToRgb(hexB);
+        return rgbToHex((a.r + b.r) / 2, (a.g + b.g) / 2, (a.b + b.b) / 2);
+    }
+
+    /** Hatch drawn on top of a solid base fill (canvas pattern, cached per base hex). */
+    var _crossHatchPatternCache = {};
+    function getCrossProcessHatchPattern(baseHex) {
+        var key = (baseHex || '_default') + '_hstroke2';
+        if (_crossHatchPatternCache[key]) return _crossHatchPatternCache[key];
+        var rgb = hexToRgb(baseHex || '#f5f5f5');
+        var w = 22;
+        var h = 22;
+        var c = document.createElement('canvas');
+        c.width = w;
+        c.height = h;
+        var ctx = c.getContext('2d');
+        ctx.fillStyle = 'rgb(' + rgb.r + ',' + rgb.g + ',' + rgb.b + ')';
+        ctx.fillRect(0, 0, w, h);
+        ctx.strokeStyle = MPL_DIMGREY_HATCH_STROKE;
+        ctx.lineWidth = 1;
+        ctx.lineCap = 'square';
+        var step = 8;
+        for (var o = -w; o <= w + h; o += step) {
+            ctx.beginPath();
+            ctx.moveTo(o, 0);
+            ctx.lineTo(o + h, h);
+            ctx.stroke();
+        }
+        _crossHatchPatternCache[key] = ctx.createPattern(c, 'repeat');
+        return _crossHatchPatternCache[key];
+    }
+
+    /** Tri-state: true / false / null (missing or unknown). */
+    function parseDominanceBool(v) {
+        if (v === true || v === 1) return true;
+        if (v === false || v === 0) return false;
+        if (v === null || v === undefined || v === '') return null;
+        var s = String(v).trim().toLowerCase();
+        if (s === '1' || s === 'true' || s === 'yes') return true;
+        if (s === '0' || s === 'false' || s === 'no') return false;
+        return null;
+    }
+
+    /**
+     * Hatch when water_balance_losses_dominance is strictly false (losses not dominant).
+     * No hatch when strictly true (losses dominant). Unknown/missing → no hatch.
+     */
+    function waterBalanceLossesHatchActive(properties) {
+        return parseDominanceBool(properties && properties.water_balance_losses_dominance) === false;
+    }
+
+    var CROSS_PROCESS_DOMINANCE_KEYS = [
+        'baseflow_dominance',
+        'high_storage_capacity_dominance',
+        'overland_flow_dominance',
+        'water_balance_losses_dominance',
+        'unclassified',
+        'both_dominant'
+    ];
+
+    function normalizeCrossProcessDominanceProps(geojson) {
+        if (!geojson || !geojson.features) return;
+        for (var fi = 0; fi < geojson.features.length; fi++) {
+            var p = geojson.features[fi].properties;
+            if (!p) continue;
+            for (var ki = 0; ki < CROSS_PROCESS_DOMINANCE_KEYS.length; ki++) {
+                var key = CROSS_PROCESS_DOMINANCE_KEYS[ki];
+                if (!Object.prototype.hasOwnProperty.call(p, key)) continue;
+                var t = parseDominanceBool(p[key]);
+                if (t === true) p[key] = true;
+                else if (t === false) p[key] = false;
+                else p[key] = null;
+            }
+        }
+    }
+
+    /**
+     * Cross-process layer: blended fill when both_dominant is true; else baseflow / overland singly;
+     * light gray when unclassified is true;
+     * diagonal hatch when water_balance_losses_dominance is false (no hatch when true);
+     * black stroke on top when high_storage_capacity_dominance is true.
+     */
+    function crossProcessStyleFromProps(properties) {
+        var bf = parseDominanceBool(properties && properties.baseflow_dominance);
+        var ol = parseDominanceBool(properties && properties.overland_flow_dominance);
+        var hs = parseDominanceBool(properties && properties.high_storage_capacity_dominance);
+        var uncl = parseDominanceBool(properties && properties.unclassified) === true;
+
+        var hsTrue = hs === true;
+        var wbHatch = waterBalanceLossesHatchActive(properties);
+        var olTrue = ol === true;
+        var bfTrue = bf === true;
+        var bothDominant = parseDominanceBool(properties && properties.both_dominant) === true;
+
+        var baseHex;
+        if (uncl) {
+            baseHex = MPL_LIGHTGRAY;
+        } else if (bothDominant) {
+            baseHex = blendHexColors(MPL_ROYALBLUE, MPL_LIGHTCORAL);
+        } else if (bfTrue) {
+            baseHex = MPL_ROYALBLUE;
+        } else if (olTrue) {
+            baseHex = MPL_LIGHTCORAL;
+        } else {
+            baseHex = '#dedede';
+        }
+
+        var domFillStrong = bothDominant || bfTrue || olTrue;
+        var fillOp = uncl ? CROSS_FILL_OPACITY_UNCLASSIFIED : (domFillStrong ? CROSS_FILL_OPACITY_DOMINANT : CROSS_FILL_OPACITY_NEUTRAL);
+
+        var s = {
+            stroke: true,
+            fill: true,
+            opacity: 0.95,
+            fillOpacity: fillOp,
+            fillColor: baseHex,
+            color: baseHex,
+            weight: 1.25
+        };
+
+        if (wbHatch) {
+            s.fillColor = getCrossProcessHatchPattern(baseHex);
+            s.fillOpacity = uncl
+                ? CROSS_FILL_OPACITY_UNCLASSIFIED
+                : (domFillStrong ? CROSS_FILL_OPACITY_HATCH_DOMINANT : CROSS_FILL_OPACITY_HATCH_OTHER);
+        }
+
+        if (hsTrue) {
+            s.color = '#000000';
+            s.weight = 2.75;
+            s.opacity = 1;
+        } else if (wbHatch) {
+            s.color = MPL_DIMGREY_HATCH_STROKE;
+            s.weight = 2.25;
+            s.opacity = 1;
+        }
+
+        return s;
+    }
+
+    /** Plain Yes/No for popups: only explicit true → Yes, else No. */
+    function layYesNoDominance(v) {
+        return parseDominanceBool(v) === true ? 'Yes' : 'No';
+    }
+
+    /**
+     * Water balance losses dominance line: Yes iff true, No iff false (matches hatch rule).
+     * Missing/invalid values show — (no hatch in that case).
+     */
+    function waterBalanceLossesDominanceYesNo(v) {
+        var t = parseDominanceBool(v);
+        if (t === true) return 'Yes';
+        if (t === false) return 'No';
+        return '—';
+    }
+
     function buildPopupHtml(layerLabel, props) {
         if (!props) return '<p>No properties</p>';
         var keys = Object.keys(props);
@@ -249,6 +520,15 @@
         var parts = [];
         parts.push('<div class="sig-popup">');
         parts.push('<p><strong>' + escapeHtml(layerLabel) + '</strong></p>');
+
+        if (layerLabel === 'Cross-process dominance') {
+            parts.push('<div class="sig-popup-lay">');
+            parts.push('<p>Is Baseflow dominant: ' + escapeHtml(layYesNoDominance(props.baseflow_dominance)) + '</p>');
+            parts.push('<p>Is Overland Flow dominant: ' + escapeHtml(layYesNoDominance(props.overland_flow_dominance)) + '</p>');
+            parts.push('<p>Is Storage Capacity high: ' + escapeHtml(layYesNoDominance(props.high_storage_capacity_dominance)) + '</p>');
+            parts.push('<p>Is Water Balance Losses dominant? ' + escapeHtml(waterBalanceLossesDominanceYesNo(props.water_balance_losses_dominance)) + '</p>');
+            parts.push('</div>');
+        }
 
         percKeys.forEach(function (percKey) {
             var baseKey = percKey.slice(0, -5);
@@ -268,12 +548,18 @@
         parts.push('<div class="meta">');
         parts.push('<strong>gauge_id</strong>: ' + escapeHtml(formatValue(props.gauge_id)) + '<br>');
         parts.push('<strong>gauge_name</strong>: ' + escapeHtml(formatValue(props.gauge_name)) + '<br>');
-        parts.push('<strong>source</strong>:' + sourceDisplay(props));
+        parts.push('<strong>source</strong>: ' + sourceDisplay(props));
         parts.push('</div></div>');
         return parts.join('');
     }
 
     var layerSpecs = [
+        {
+            label: 'Cross-process dominance',
+            path: '../assets/shp/sig_us/sigs_cross_process_dominance.geojson',
+            legendIsHtml: true,
+            isCrossProcess: true
+        },
         { label: 'Baseflow', path: '../assets/shp/sig_us/sigs_Baseflow.geojson', legend: '../assets/shp/sig_us/legend_baseflow.png', legendAlt: 'Baseflow (BFI × baseflow recession) bivariate legend' },
         { label: 'High storage capacity', path: '../assets/shp/sig_us/sigs_HighStorageCapacity.geojson', legend: '../assets/shp/sig_us/legend_storage.png', legendAlt: 'High storage capacity bivariate legend' },
         { label: 'Overland flow', path: '../assets/shp/sig_us/sigs_OverlandFlow.geojson', legend: '../assets/shp/sig_us/legend_overland.png', legendAlt: 'Overland flow bivariate legend' },
@@ -312,7 +598,7 @@
         setTimeout(afterLayout, 350);
     }
 
-    /** Only Baseflow drives the initial extent so CDN/network order does not change zoom vs local. */
+    /** First of Baseflow or Cross-process dominance to finish loading sets initial map extent. */
     function trySetInitialExtentFromGeojson(geojson) {
         if (initialExtentBounds) return;
         try {
@@ -354,13 +640,24 @@
         lastSearchHighlights = [];
     }
 
-    function highlightStyleFn(properties, zoom) {
-        var s = pathStyleFromProps(properties);
-        s.weight = 4;
-        s.opacity = 1;
-        s.fillOpacity = 0.55;
-        s.color = '#1a1a1a';
-        return s;
+    function makeSearchHighlightStyleFn(styleFn) {
+        return function (properties, zoom) {
+            var s = styleFn(properties, zoom);
+            var hatch = waterBalanceLossesHatchActive(properties);
+            var outlineOnly = !hatch && s.fillOpacity === 0;
+            s.weight = Math.max(s.weight || 1, 4);
+            s.opacity = 1;
+            s.color = '#b71c1c';
+            if (hatch) {
+                s.fillOpacity = Math.min(1, (s.fillOpacity != null ? s.fillOpacity : 1) * 0.55);
+            } else if (outlineOnly) {
+                s.fillColor = '#ffeb3b';
+                s.fillOpacity = 0.35;
+            } else {
+                s.fillOpacity = Math.min(0.58, Math.max(0.22, (s.fillOpacity != null ? s.fillOpacity : 0.2) + 0.12));
+            }
+            return s;
+        };
     }
 
     function hasActiveSigLayer() {
@@ -384,6 +681,22 @@
         return out;
     }
 
+    function appendCrossProcessLegend(parentEl) {
+        var root = L.DomUtil.create('div', 'sig-legend-cross-process', parentEl);
+        function row(swClass, text) {
+            var r = L.DomUtil.create('div', 'sig-cp-row', root);
+            var sw = L.DomUtil.create('span', 'sig-cp-sw ' + swClass, r);
+            r.appendChild(document.createTextNode(text));
+        }
+        row('sig-cp-fill-royalblue', 'Baseflow is dominant');
+        row('sig-cp-fill-lightcoral', 'Overland flow is dominant');
+        row('sig-cp-fill-blended', 'Both baseflow and overland are dominant');
+        row('sig-cp-fill-lightgray', 'Unclassified');
+        row('sig-cp-hatch-on-fill', 'Water balance losses not dominant');
+        row('sig-cp-outline-black', 'High storage capacity');
+        return root;
+    }
+
     function updateSignatureLegendVisibility() {
         if (!legendWrapEl || !legendImagesEl) return;
         var active = activeSignatureSpecs();
@@ -396,9 +709,13 @@
         }
         for (var i = 0; i < active.length; i++) {
             var spec = active[i];
-            var im = L.DomUtil.create('img', '', legendImagesEl);
-            im.src = spec.legend;
-            im.alt = spec.legendAlt;
+            if (spec.legendIsHtml) {
+                appendCrossProcessLegend(legendImagesEl);
+            } else {
+                var im = L.DomUtil.create('img', '', legendImagesEl);
+                im.src = spec.legend;
+                im.alt = spec.legendAlt || spec.label;
+            }
         }
         legendWrapEl.style.display = 'block';
     }
@@ -453,10 +770,10 @@
             map.setView(ll, 12);
         }
 
-        loadedSigLayers.forEach(function (L) {
-            if (!map.hasLayer(L.group)) return;
+        loadedSigLayers.forEach(function (lyr) {
+            if (!map.hasLayer(lyr.group)) return;
             var has = false;
-            var feats = L.data && L.data.features;
+            var feats = lyr.data && lyr.data.features;
             if (!feats) return;
             for (var k = 0; k < feats.length; k++) {
                 if (feats[k].properties && String(feats[k].properties.gauge_id) === match.gaugeId) {
@@ -465,8 +782,9 @@
                 }
             }
             if (!has) return;
-            L.vectorLayer.setFeatureStyle(match.gaugeId, highlightStyleFn);
-            lastSearchHighlights.push({ vectorLayer: L.vectorLayer, id: match.gaugeId });
+            var baseFn = lyr.isCrossProcess ? crossProcessStyleFromProps : pathStyleFromProps;
+            lyr.vectorLayer.setFeatureStyle(match.gaugeId, makeSearchHighlightStyleFn(baseFn));
+            lastSearchHighlights.push({ vectorLayer: lyr.vectorLayer, id: match.gaugeId });
         });
 
         var p = match.feature.properties;
@@ -478,71 +796,121 @@
 
     var vectorTileLayerName = 'sliced';
 
+    /** Large GeoJSON files often fail with truncated bodies → JSON "Unexpected end of input". */
+    var GEOJSON_FETCH_RETRIES = 4;
+    var GEOJSON_FETCH_RETRY_DELAY_MS = 700;
+
+    function delayPromise(ms) {
+        return new Promise(function (resolve) {
+            setTimeout(resolve, ms);
+        });
+    }
+
+    function fetchGeoJsonWithRetries(path) {
+        function once(attempt) {
+            var url = attempt > 1
+                ? path + (path.indexOf('?') >= 0 ? '&' : '?') + '_=' + Date.now() + '&_try=' + attempt
+                : path;
+            return fetch(url, { credentials: 'same-origin' })
+                .then(function (response) {
+                    if (!response.ok) {
+                        throw new Error(path + ': HTTP ' + response.status + ' ' + response.statusText);
+                    }
+                    return response.text();
+                })
+                .then(function (text) {
+                    if (text == null || String(text).trim() === '') {
+                        throw new Error(path + ': empty response body');
+                    }
+                    try {
+                        return JSON.parse(text);
+                    } catch (pe) {
+                        var msg = (pe && pe.message) ? pe.message : 'JSON parse error';
+                        throw new Error(msg + ' - received ' + text.length + ' characters (file may be truncated or not JSON)');
+                    }
+                })
+                .catch(function (err) {
+                    if (attempt >= GEOJSON_FETCH_RETRIES) {
+                        throw err;
+                    }
+                    console.warn('GeoJSON fetch attempt ' + attempt + ' failed for ' + path + ':', err.message || err);
+                    return delayPromise(GEOJSON_FETCH_RETRY_DELAY_MS * attempt).then(function () {
+                        return once(attempt + 1);
+                    });
+                });
+        }
+        return once(1);
+    }
+
+    function installSigVectorLayer(spec, group, data) {
+        if (spec.label === 'Baseflow' || spec.label === 'Cross-process dominance') {
+            trySetInitialExtentFromGeojson(data);
+        }
+        if (spec.isCrossProcess) {
+            normalizeCrossProcessDominanceProps(data);
+        }
+
+        var vtStyles = {};
+        var styleFn = spec.isCrossProcess ? crossProcessStyleFromProps : pathStyleFromProps;
+        vtStyles[vectorTileLayerName] = function (properties, zoom) {
+            return styleFn(properties, zoom);
+        };
+
+        var vectorLayer = L.vectorGrid.slicer(data, {
+            rendererFactory: L.canvas.tile,
+            pane: 'overlayPane',
+            interactive: true,
+            vectorTileLayerName: vectorTileLayerName,
+            getFeatureId: function (feat) {
+                var g = feat.properties && feat.properties.gauge_id;
+                return g != null && g !== '' ? String(g) : '_';
+            },
+            maxZoom: 16,
+            tolerance: 3,
+            buffer: 64,
+            vectorTileLayerStyles: vtStyles
+        });
+
+        vectorLayer.on('click', function (e) {
+            var lyr = e.layer || e.propagatedFrom;
+            var props = lyr && (lyr.properties || lyr.feature && lyr.feature.properties);
+            if (!props) return;
+            L.popup({ maxWidth: 340, autoPan: true, keepInView: true })
+                .setLatLng(e.latlng)
+                .setContent(buildPopupHtml(spec.label, props))
+                .openOn(map);
+        });
+
+        vectorLayer.addTo(group);
+
+        loadedSigLayers.push({
+            group: group,
+            vectorLayer: vectorLayer,
+            data: data,
+            label: spec.label,
+            isCrossProcess: !!spec.isCrossProcess
+        });
+
+        if (spec.label === 'Cross-process dominance') {
+            group.addTo(map);
+        }
+        updateSignatureLegendVisibility();
+        console.log('Loaded vector layer:', spec.label);
+    }
+
+    /** One request at a time avoids parallel multi‑MB downloads stalling or truncating (e.g. Overland flow ~15 MB). */
+    var layerLoadChain = Promise.resolve();
     layerSpecs.forEach(function (spec) {
         var group = L.layerGroup();
         overlayMaps[spec.label] = group;
-
-        fetch(spec.path)
-            .then(function (response) {
-                if (!response.ok) {
-                    throw new Error(spec.path + ': ' + response.status + ' ' + response.statusText);
-                }
-                return response.json();
-            })
-            .then(function (data) {
-                if (spec.label === 'Baseflow') {
-                    trySetInitialExtentFromGeojson(data);
-                }
-
-                var vtStyles = {};
-                vtStyles[vectorTileLayerName] = function (properties, zoom) {
-                    return pathStyleFromProps(properties);
-                };
-
-                var vectorLayer = L.vectorGrid.slicer(data, {
-                    rendererFactory: L.canvas.tile,
-                    pane: 'overlayPane',
-                    interactive: true,
-                    vectorTileLayerName: vectorTileLayerName,
-                    getFeatureId: function (feat) {
-                        var g = feat.properties && feat.properties.gauge_id;
-                        return g != null && g !== '' ? String(g) : '_';
-                    },
-                    maxZoom: 16,
-                    tolerance: 3,
-                    buffer: 64,
-                    vectorTileLayerStyles: vtStyles
-                });
-
-                vectorLayer.on('click', function (e) {
-                    var lyr = e.layer || e.propagatedFrom;
-                    var props = lyr && (lyr.properties || lyr.feature && lyr.feature.properties);
-                    if (!props) return;
-                    L.popup({ maxWidth: 340, autoPan: true, keepInView: true })
-                        .setLatLng(e.latlng)
-                        .setContent(buildPopupHtml(spec.label, props))
-                        .openOn(map);
-                });
-
-                vectorLayer.addTo(group);
-
-                loadedSigLayers.push({
-                    group: group,
-                    vectorLayer: vectorLayer,
-                    data: data,
-                    label: spec.label
-                });
-
-                if (spec.label === 'Baseflow') {
-                    group.addTo(map);
-                }
-                updateSignatureLegendVisibility();
-                console.log('Loaded vector layer:', spec.label);
-            })
-            .catch(function (err) {
+        layerLoadChain = layerLoadChain.then(function () {
+            return fetchGeoJsonWithRetries(spec.path).then(function (data) {
+                installSigVectorLayer(spec, group, data);
+            }).catch(function (err) {
                 console.error(err);
                 alert('Failed to load ' + spec.label + ': ' + err.message);
             });
+        });
     });
 
     L.control.layers(baseMaps, overlayMaps, { collapsed: false }).addTo(map);
