@@ -5,6 +5,9 @@
     <title>Dominant Processes Inferred from Hydrologic Signatures</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
         integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
         crossorigin=""/>
@@ -32,26 +35,54 @@
             margin: 0;
             padding: 0;
             font-family: Helvetica, Arial, sans-serif;
+            background-color: #F8F8F8;
         }
         body {
             padding-top: 10px;
             box-sizing: border-box;
         }
+        .sig-page-title {
+            text-align: left;
+            margin: 0 20px 10px 20px;
+            font-family: 'Open Sans', 'Segoe UI', system-ui, sans-serif;
+            font-size: 1.25rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            line-height: 1.3;
+            color: #111;
+        }
+        #search-container {
+            margin: 0 20px 10px 20px;
+            text-align: left;
+        }
         #map {
             height: calc(100vh - 270px);
-            min-height: 360px;
+            min-height: 280px;
             width: 100%;
         }
-        .sig-citation {
-            margin: 0 20px 14px 20px;
-            max-width: 960px;
-            font-size: 13px;
-            line-height: 1.45;
-            color: #333;
-        }
-        .sig-citation a {
-            color: #1a5fb4;
-            word-break: break-all;
+        /* Laptop / desktop: flex column fills viewport — map grows to remaining height (no vertical page scroll) */
+        @media (min-width: 769px) {
+            html, body {
+                max-height: 100%;
+                overflow: hidden;
+            }
+            body {
+                display: flex;
+                flex-direction: column;
+                padding-top: 8px;
+                height: 100%;
+            }
+            .sig-page-title {
+                flex: 0 0 auto;
+            }
+            #search-container {
+                flex: 0 0 auto;
+            }
+            #map {
+                flex: 1 1 auto;
+                min-height: 0;
+                height: auto;
+            }
         }
         .sig-popup p {
             margin: 0.4em 0;
@@ -157,16 +188,57 @@
             margin-top: 10px;
             border-top: 1px solid rgba(0, 0, 0, 0.22);
         }
+
+        /* Mobile: scroll if needed; smaller legend; collapsible layers (JS). */
+        @media (max-width: 768px) {
+            html, body {
+                overflow-x: hidden;
+            }
+            body {
+                overflow-y: auto;
+                height: auto;
+                min-height: 100%;
+            }
+            .sig-bivariate-legend-wrap {
+                padding: 6px 8px;
+                margin: 6px;
+                max-width: min(260px, 72vw);
+                font-size: 11px;
+                line-height: 1.15;
+            }
+            .sig-legend-images > * + * {
+                margin-top: 6px;
+            }
+            .sig-legend-cross-process {
+                font-size: 10px;
+                line-height: 1.4;
+            }
+            .sig-legend-cross-process .sig-cp-row {
+                gap: 5px;
+                margin-top: 2px;
+            }
+            .sig-legend-cross-process .sig-cp-sw {
+                flex: 0 0 22px;
+                height: 13px;
+            }
+            .sig-legend-images img {
+                max-height: 120px;
+                width: auto;
+                object-fit: contain;
+            }
+            #map .leaflet-control-layers-toggle {
+                width: 38px;
+                height: 38px;
+            }
+        }
     </style>
 </head>
 <body>
 
-<h1 style="text-align: left; margin-left: 20px; margin-bottom: 12px;"> &#127754 Dominant processes inferred from Hydrologic Signatures</h1>
+<h1 class="sig-page-title">&#127754; Dominant Processes Inferred from Hydrologic Signatures</h1>
 
-<p class="sig-citation">Araki, R., Holt, A., Hammond, J. C., Husic, A., Coxon, G., and McMillan, H. K.: <br>Continental-scale prediction of hydrologic signatures and processes,  <br> EGUsphere [preprint], <a href="https://doi.org/10.5194/egusphere-2025-6156" target="_blank" rel="noopener">https://doi.org/10.5194/egusphere-2025-6156</a>, 2025.</p>
-
-<div id="search-container" style="margin-bottom: 10px; text-align: center;">
-    <input type="text" id="gaugeIdSearchInput" placeholder="Gauge ID (substring match, e.g. camels_01013500)">
+<div id="search-container">
+    <input type="text" id="gaugeIdSearchInput" placeholder="Gauge ID (substring match)">
     <button type="button" id="gaugeIdSearchButton">Search</button>
 </div>
 
@@ -178,6 +250,28 @@
         throw new Error('Leaflet.VectorGrid unavailable');
     }
 
+    /* Leaflet joins attribution strings with ", "; use "|" between every segment (match prefix↔body separator). */
+    (function () {
+        var pipeSep = ' <span aria-hidden="true">|</span> ';
+        L.Control.Attribution.prototype._update = function () {
+            if (!this._map) { return; }
+            var attribs = [];
+            for (var k in this._attributions) {
+                if (this._attributions[k]) {
+                    attribs.push(k);
+                }
+            }
+            var parts = [];
+            if (this.options.prefix) {
+                parts.push(this.options.prefix);
+            }
+            if (attribs.length) {
+                parts.push(attribs.join(pipeSep));
+            }
+            this._container.innerHTML = parts.join(pipeSep);
+        };
+    }());
+
     var map = L.map('map').setView([39.8283, -98.5795], 4);
 
     var osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -188,7 +282,9 @@
     });
     osmLayer.addTo(map);
 
-    var caravanCredit = 'Watershed shapes from Caravan v1.4 (Kratzert et al., 2024) &copy; <a href="https://doi.org/10.5281/zenodo.10968468" target="_blank" rel="noopener">DOI:10.5281/zenodo.10968468</a> and GAGES-II (Falcone et al., 2010) &copy; <a href="https://doi.org/10.3133/70046617" target="_blank" rel="noopener">DOI:10.3133/70046617</a>; simplified for visualization.';
+    var paperAttribution = 'Araki, R., Holt, A., Hammond, J. C., Husic, A., Coxon, G., and McMillan, H. K.: Continental-scale prediction of hydrologic signatures and processes, EGUsphere [preprint], <a href="https://doi.org/10.5194/egusphere-2025-6156" target="_blank" rel="noopener">https://doi.org/10.5194/egusphere-2025-6156</a>, 2025.';
+    var caravanCredit = 'Watershed shapes from <a href="https://doi.org/10.5281/zenodo.10968468" target="_blank" rel="noopener">Caravan v1.4 (Kratzert et al., 2024)</a> and <a href="https://doi.org/10.3133/70046617" target="_blank" rel="noopener">GAGES-II (Falcone et al., 2010)</a>; simplified for visualization.';
+    map.attributionControl.addAttribution(paperAttribution);
     map.attributionControl.addAttribution(caravanCredit);
 
     /* While a popup is open, disable map dragging so pointer moves do not pan the map (stuck drag). */
@@ -991,7 +1087,31 @@
         });
     });
 
-    L.control.layers(baseMaps, overlayMaps, { collapsed: false }).addTo(map);
+    var SIG_MAP_MOBILE_MQ = '(max-width: 768px)';
+
+    function isSigMapMobileViewport() {
+        return window.matchMedia(SIG_MAP_MOBILE_MQ).matches;
+    }
+
+    var sigLayersControl = null;
+    function attachSigLayersControl() {
+        if (sigLayersControl) {
+            map.removeControl(sigLayersControl);
+            sigLayersControl = null;
+        }
+        sigLayersControl = L.control.layers(baseMaps, overlayMaps, {
+            collapsed: isSigMapMobileViewport()
+        }).addTo(map);
+        setTimeout(syncSignatureOverlayCheckboxes, 0);
+    }
+
+    attachSigLayersControl();
+    var sigMapMobileMql = window.matchMedia(SIG_MAP_MOBILE_MQ);
+    if (typeof sigMapMobileMql.addEventListener === 'function') {
+        sigMapMobileMql.addEventListener('change', attachSigLayersControl);
+    } else if (typeof sigMapMobileMql.addListener === 'function') {
+        sigMapMobileMql.addListener(attachSigLayersControl);
+    }
 
     /** Signature overlays (layerSpecs) are mutually exclusive: turning one on removes the others. Basemaps unchanged. */
     function isSignatureOverlayLabel(name) {
