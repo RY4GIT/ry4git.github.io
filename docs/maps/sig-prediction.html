@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Build using #bundle exec jekyll serve -l -H localhost" -->
 <html>
 <head>
     <title>Dominant Processes Inferred from Hydrologic Signatures</title>
@@ -149,6 +150,13 @@
             margin-bottom: 10px;
             border-bottom: 1px solid rgba(0, 0, 0, 0.22);
         }
+        /* Line/spacing before last overlay (SHAP / Group_max layer) */
+        #map .leaflet-control-layers-overlays > label:last-of-type {
+            display: block;
+            padding-top: 10px;
+            margin-top: 10px;
+            border-top: 1px solid rgba(0, 0, 0, 0.22);
+        }
     </style>
 </head>
 <body>
@@ -218,8 +226,15 @@
         overland_flow_dominance: true,
         water_balance_losses_dominance: true,
         unclassified: true,
-        both_dominant: true
+        both_dominant: true,
+        Group_max: true
     };
+
+    /**
+     * Plain-text name for the SHAP / Group_max overlay (must match layerSpecs label).
+     * Leaflet layer control does not render HTML in names — use a two-line title in the popup only.
+     */
+    var SHAP_GROUP_MAX_LAYER_LABEL = 'Influential attributes (random forest)';
 
     function escapeHtml(s) {
         if (s == null) return '';
@@ -519,7 +534,11 @@
 
         var parts = [];
         parts.push('<div class="sig-popup">');
-        parts.push('<p><strong>' + escapeHtml(layerLabel) + '</strong></p>');
+        if (layerLabel === SHAP_GROUP_MAX_LAYER_LABEL) {
+            parts.push('<p><strong>Most influential attributes across all processes<br>(random forest, Shapley analysis)</strong></p>');
+        } else {
+            parts.push('<p><strong>' + escapeHtml(layerLabel) + '</strong></p>');
+        }
 
         if (layerLabel === 'Cross-process dominance') {
             parts.push('<div class="sig-popup-lay">');
@@ -528,6 +547,16 @@
             parts.push('<p>Is Storage Capacity high: ' + escapeHtml(layYesNoDominance(props.high_storage_capacity_dominance)) + '</p>');
             parts.push('<p>Is Water Balance Losses dominant? ' + escapeHtml(waterBalanceLossesDominanceYesNo(props.water_balance_losses_dominance)) + '</p>');
             parts.push('</div>');
+        }
+
+        if (layerLabel === SHAP_GROUP_MAX_LAYER_LABEL) {
+            parts.push('<p><strong>gauge_id</strong>: ' + escapeHtml(formatValue(props.gauge_id)) + '</p>');
+            parts.push('<p><strong>Group_max</strong>: ' + escapeHtml(formatValue(props.Group_max)) + '</p>');
+            used.gauge_id = true;
+            used.Group_max = true;
+            used.color = true;
+            parts.push('</div>');
+            return parts.join('');
         }
 
         percKeys.forEach(function (percKey) {
@@ -561,11 +590,17 @@
             isCrossProcess: true
         },
         { label: 'Baseflow', path: '../assets/shp/sig_us/sigs_Baseflow.geojson', legend: '../assets/shp/sig_us/legend_baseflow.png', legendAlt: 'Baseflow (BFI × baseflow recession) bivariate legend' },
-        { label: 'High storage capacity', path: '../assets/shp/sig_us/sigs_HighStorageCapacity.geojson', legend: '../assets/shp/sig_us/legend_storage.png', legendAlt: 'High storage capacity bivariate legend' },
         { label: 'Overland flow', path: '../assets/shp/sig_us/sigs_OverlandFlow.geojson', legend: '../assets/shp/sig_us/legend_overland.png', legendAlt: 'Overland flow bivariate legend' },
         { label: 'Overland flow type', path: '../assets/shp/sig_us/sigs_OverlandFlowType.geojson', legend: '../assets/shp/sig_us/legend_overland_type.png', legendAlt: 'Overland flow type legend' },
+        { label: 'Water balance losses', path: '../assets/shp/sig_us/sigs_WaterBalanceLosses.geojson', legend: '../assets/shp/sig_us/legend_waterbalance.png', legendAlt: 'Water balance losses bivariate legend' },
+        { label: 'High storage capacity', path: '../assets/shp/sig_us/sigs_HighStorageCapacity.geojson', legend: '../assets/shp/sig_us/legend_storage.png', legendAlt: 'High storage capacity bivariate legend' },
         { label: 'Seasonal variability', path: '../assets/shp/sig_us/sigs_SeasonalVariability.geojson', legend: '../assets/shp/sig_us/legend_season.png', legendAlt: 'Seasonal variability bivariate legend' },
-        { label: 'Water balance losses', path: '../assets/shp/sig_us/sigs_WaterBalanceLosses.geojson', legend: '../assets/shp/sig_us/legend_waterbalance.png', legendAlt: 'Water balance losses bivariate legend' }
+        {
+            label: SHAP_GROUP_MAX_LAYER_LABEL,
+            path: '../assets/shp/sig_us/shap_most_important_cat_in_map_all_processes.geojson',
+            legendIsHtml: true,
+            legendKind: 'groupMax'
+        }
     ];
 
     var overlayMaps = {};
@@ -652,7 +687,7 @@
                 s.fillOpacity = Math.min(1, (s.fillOpacity != null ? s.fillOpacity : 1) * 0.55);
             } else if (outlineOnly) {
                 s.fillColor = '#ffeb3b';
-                s.fillOpacity = 0.35;
+                s.fillOpacity = 0.5;
             } else {
                 s.fillOpacity = Math.min(0.58, Math.max(0.22, (s.fillOpacity != null ? s.fillOpacity : 0.2) + 0.12));
             }
@@ -697,6 +732,44 @@
         return root;
     }
 
+    function collectGroupMaxLegendRows(geojson) {
+        var seen = {};
+        var out = [];
+        var feats = geojson && geojson.features;
+        if (!feats) return out;
+        for (var i = 0; i < feats.length; i++) {
+            var p = feats[i].properties;
+            if (!p) continue;
+            var label = p.Group_max != null && String(p.Group_max).trim() !== '' ? String(p.Group_max) : '—';
+            var hex = colorFromProps(p);
+            var key = label + '\0' + hex;
+            if (seen[key]) continue;
+            seen[key] = true;
+            out.push({ label: label, color: hex });
+        }
+        out.sort(function (a, b) {
+            return a.label.localeCompare(b.label);
+        });
+        return out;
+    }
+
+    function appendGroupMaxLegend(parentEl, rows) {
+        var root = L.DomUtil.create('div', 'sig-legend-cross-process sig-legend-group-max', parentEl);
+        var title = L.DomUtil.create('div', '', root);
+        title.style.fontWeight = '600';
+        title.style.marginBottom = '6px';
+        title.textContent = 'Group_max';
+        var list = rows && rows.length ? rows : [];
+        for (var i = 0; i < list.length; i++) {
+            var r = L.DomUtil.create('div', 'sig-cp-row', root);
+            var sw = L.DomUtil.create('span', 'sig-cp-sw', r);
+            sw.style.backgroundColor = list[i].color;
+            sw.style.border = '1px solid rgba(0, 0, 0, 0.35)';
+            r.appendChild(document.createTextNode(list[i].label));
+        }
+        return root;
+    }
+
     function updateSignatureLegendVisibility() {
         if (!legendWrapEl || !legendImagesEl) return;
         var active = activeSignatureSpecs();
@@ -709,7 +782,9 @@
         }
         for (var i = 0; i < active.length; i++) {
             var spec = active[i];
-            if (spec.legendIsHtml) {
+            if (spec.legendIsHtml && spec.legendKind === 'groupMax') {
+                appendGroupMaxLegend(legendImagesEl, spec._groupMaxLegendRows);
+            } else if (spec.legendIsHtml) {
                 appendCrossProcessLegend(legendImagesEl);
             } else {
                 var im = L.DomUtil.create('img', '', legendImagesEl);
@@ -849,6 +924,9 @@
         if (spec.isCrossProcess) {
             normalizeCrossProcessDominanceProps(data);
         }
+        if (spec.legendKind === 'groupMax') {
+            spec._groupMaxLegendRows = collectGroupMaxLegendRows(data);
+        }
 
         var vtStyles = {};
         var styleFn = spec.isCrossProcess ? crossProcessStyleFromProps : pathStyleFromProps;
@@ -914,6 +992,85 @@
     });
 
     L.control.layers(baseMaps, overlayMaps, { collapsed: false }).addTo(map);
+
+    /** Signature overlays (layerSpecs) are mutually exclusive: turning one on removes the others. Basemaps unchanged. */
+    function isSignatureOverlayLabel(name) {
+        for (var si = 0; si < layerSpecs.length; si++) {
+            if (layerSpecs[si].label === name) return true;
+        }
+        return false;
+    }
+
+    /** Leaflet sometimes leaves overlay checkboxes out of sync when removeLayer runs inside overlayadd; force match to map. */
+    function syncSignatureOverlayCheckboxes() {
+        var root = document.querySelector('#map .leaflet-control-layers-overlays');
+        if (!root) return;
+        var labels = root.querySelectorAll('label');
+        var specCount = layerSpecs.length;
+        if (labels.length === specCount) {
+            for (var k = 0; k < specCount; k++) {
+                var inp = labels[k].querySelector('input[type="checkbox"]');
+                if (!inp) continue;
+                var grp = overlayMaps[layerSpecs[k].label];
+                inp.checked = !!(grp && map.hasLayer(grp));
+            }
+        } else {
+            for (var i = 0; i < labels.length; i++) {
+                var lab = labels[i];
+                var input = lab.querySelector('input[type="checkbox"]');
+                if (!input) continue;
+                var nameNode = lab.querySelector('span');
+                var t = nameNode ? nameNode.textContent.replace(/\s+/g, ' ').trim() : '';
+                for (var j = 0; j < specCount; j++) {
+                    var nl = layerSpecs[j].label.replace(/\s+/g, ' ').trim();
+                    if (t === nl) {
+                        var g = overlayMaps[layerSpecs[j].label];
+                        input.checked = !!(g && map.hasLayer(g));
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    map.on('overlayadd', function (e) {
+        var name = e && e.name;
+        if (!name && e && e.layer) {
+            for (var key in overlayMaps) {
+                if (Object.prototype.hasOwnProperty.call(overlayMaps, key) && overlayMaps[key] === e.layer) {
+                    name = key;
+                    break;
+                }
+            }
+        }
+        if (!name || !isSignatureOverlayLabel(name)) return;
+        function deactivateOthers() {
+            for (var si = 0; si < layerSpecs.length; si++) {
+                var lbl = layerSpecs[si].label;
+                if (lbl === name) continue;
+                var grp = overlayMaps[lbl];
+                if (grp && map.hasLayer(grp)) {
+                    map.removeLayer(grp);
+                }
+            }
+            syncSignatureOverlayCheckboxes();
+        }
+        setTimeout(deactivateOthers, 0);
+    });
+
+    map.on('overlayremove', function (e) {
+        var name = e && e.name;
+        if (!name && e && e.layer) {
+            for (var key2 in overlayMaps) {
+                if (Object.prototype.hasOwnProperty.call(overlayMaps, key2) && overlayMaps[key2] === e.layer) {
+                    name = key2;
+                    break;
+                }
+            }
+        }
+        if (!name || !isSignatureOverlayLabel(name)) return;
+        setTimeout(syncSignatureOverlayCheckboxes, 0);
+    });
 
     var signatureLegendControl = L.control({ position: 'bottomright' });
     signatureLegendControl.onAdd = function () {
