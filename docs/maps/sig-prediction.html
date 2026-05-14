@@ -83,6 +83,36 @@
                 min-height: 0;
                 height: auto;
             }
+            /* Desktop: keep bivariate / HTML legends compact so they do not cover most of the map. */
+            .sig-bivariate-legend-wrap {
+                max-width: min(200px, 28vw);
+                max-height: min(432px, 50.4vh);
+                padding: 5px 7px;
+                margin: 6px;
+                overflow-y: auto;
+                font-size: 10px;
+                line-height: 1.15;
+            }
+            .sig-legend-images > * + * {
+                margin-top: 5px;
+            }
+            .sig-legend-cross-process {
+                font-size: 9.5px;
+                line-height: 1.3;
+            }
+            .sig-legend-cross-process .sig-cp-row {
+                gap: 5px;
+                margin-top: 2px;
+            }
+            .sig-legend-cross-process .sig-cp-sw {
+                flex: 0 0 20px;
+                height: 11px;
+            }
+            .sig-legend-images img {
+                max-height: min(158px, 28.8vh);
+                width: auto;
+                object-fit: contain;
+            }
         }
         .sig-popup p {
             margin: 0.4em 0;
@@ -189,7 +219,7 @@
             border-top: 1px solid rgba(0, 0, 0, 0.22);
         }
 
-        /* Mobile: scroll if needed; smaller legend; collapsible layers (JS). */
+        /* Mobile: scroll if needed; slightly larger legend than prior mobile pass; collapsible layers (JS). */
         @media (max-width: 768px) {
             html, body {
                 overflow-x: hidden;
@@ -200,29 +230,29 @@
                 min-height: 100%;
             }
             .sig-bivariate-legend-wrap {
-                padding: 6px 8px;
-                margin: 6px;
-                max-width: min(260px, 72vw);
-                font-size: 11px;
-                line-height: 1.15;
+                padding: 8px 10px;
+                margin: 8px;
+                max-width: min(288px, 84vw);
+                font-size: 12px;
+                line-height: 1.2;
             }
             .sig-legend-images > * + * {
-                margin-top: 6px;
+                margin-top: 8px;
             }
             .sig-legend-cross-process {
-                font-size: 10px;
-                line-height: 1.4;
+                font-size: 11px;
+                line-height: 1.45;
             }
             .sig-legend-cross-process .sig-cp-row {
-                gap: 5px;
-                margin-top: 2px;
+                gap: 6px;
+                margin-top: 3px;
             }
             .sig-legend-cross-process .sig-cp-sw {
-                flex: 0 0 22px;
-                height: 13px;
+                flex: 0 0 24px;
+                height: 14px;
             }
             .sig-legend-images img {
-                max-height: 120px;
+                max-height: 145px;
                 width: auto;
                 object-fit: contain;
             }
